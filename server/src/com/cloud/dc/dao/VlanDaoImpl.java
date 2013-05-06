@@ -59,6 +59,7 @@ public class VlanDaoImpl extends GenericDaoBase<VlanVO, Long> implements VlanDao
     protected SearchBuilder<VlanVO> NetworkVlanSearch;
     protected SearchBuilder<VlanVO> PhysicalNetworkVlanSearch;
     protected SearchBuilder<VlanVO> ZoneWideNonDedicatedVlanSearch;
+    protected SearchBuilder<VlanVO> VlanGatewaysearch;
 
     protected SearchBuilder<AccountVlanMapVO> AccountVlanMapSearch;
 
@@ -103,6 +104,11 @@ public class VlanDaoImpl extends GenericDaoBase<VlanVO, Long> implements VlanDao
         PhysicalNetworkVlanSearch = createSearchBuilder();
         PhysicalNetworkVlanSearch.and("physicalNetworkId", PhysicalNetworkVlanSearch.entity().getPhysicalNetworkId(), SearchCriteria.Op.EQ);
         PhysicalNetworkVlanSearch.done();
+
+        VlanGatewaysearch = createSearchBuilder();
+        VlanGatewaysearch.and("gateway", VlanGatewaysearch.entity().getVlanGateway(), SearchCriteria.Op.EQ);
+        VlanGatewaysearch.and("networkid", VlanGatewaysearch.entity().getNetworkId(), SearchCriteria.Op.EQ);
+        VlanGatewaysearch.done();
     }
 
     @Override
@@ -314,6 +320,14 @@ public class VlanDaoImpl extends GenericDaoBase<VlanVO, Long> implements VlanDao
     public List<VlanVO> listVlansByNetworkId(long networkOfferingId) {
         SearchCriteria<VlanVO> sc = NetworkVlanSearch.create();
         sc.setParameters("networkOfferingId", networkOfferingId);
+        return listBy(sc);
+    }
+
+    @Override
+    public List<VlanVO> listVlansByNetworkIdAndGateway(long networkid, String gateway){
+        SearchCriteria<VlanVO> sc =  VlanGatewaysearch.create();
+        sc.setParameters("networkid", networkid);
+        sc.setParameters("gateway", gateway);
         return listBy(sc);
     }
 

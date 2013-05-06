@@ -17,215 +17,25 @@
 package com.cloud.hypervisor.xen.resource;
 
 
-import java.beans.BeanInfo;
-import java.beans.IntrospectionException;
-import java.beans.Introspector;
-import java.beans.PropertyDescriptor;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.StringReader;
-import java.lang.reflect.InvocationTargetException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Queue;
-import java.util.Random;
-import java.util.Set;
-import java.util.UUID;
-
-import javax.ejb.Local;
-import javax.naming.ConfigurationException;
-import javax.xml.parsers.DocumentBuilderFactory;
-
-import com.cloud.agent.api.*;
-import org.apache.cloudstack.storage.command.StorageSubSystemCommand;
-import com.cloud.agent.api.to.*;
-import com.cloud.network.rules.FirewallRule;
-import org.apache.log4j.Logger;
-import org.apache.xmlrpc.XmlRpcException;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-
 import com.cloud.agent.IAgentControl;
-import com.cloud.agent.api.Answer;
-import com.cloud.agent.api.AttachIsoCommand;
-import com.cloud.agent.api.AttachVolumeAnswer;
-import com.cloud.agent.api.AttachVolumeCommand;
-import com.cloud.agent.api.BackupSnapshotAnswer;
-import com.cloud.agent.api.BackupSnapshotCommand;
-import com.cloud.agent.api.BumpUpPriorityCommand;
-import com.cloud.agent.api.CheckHealthAnswer;
-import com.cloud.agent.api.CheckHealthCommand;
-import com.cloud.agent.api.CheckNetworkAnswer;
-import com.cloud.agent.api.CheckNetworkCommand;
-import com.cloud.agent.api.CheckOnHostAnswer;
-import com.cloud.agent.api.CheckOnHostCommand;
-import com.cloud.agent.api.CheckRouterAnswer;
-import com.cloud.agent.api.CheckRouterCommand;
-import com.cloud.agent.api.CheckS2SVpnConnectionsAnswer;
-import com.cloud.agent.api.CheckS2SVpnConnectionsCommand;
-import com.cloud.agent.api.CheckVirtualMachineAnswer;
-import com.cloud.agent.api.CheckVirtualMachineCommand;
-import com.cloud.agent.api.CleanupNetworkRulesCmd;
-import com.cloud.agent.api.ClusterSyncAnswer;
-import com.cloud.agent.api.ClusterSyncCommand;
-import com.cloud.agent.api.Command;
-import com.cloud.agent.api.CreatePrivateTemplateFromSnapshotCommand;
-import com.cloud.agent.api.CreatePrivateTemplateFromVolumeCommand;
-import com.cloud.agent.api.CreateStoragePoolCommand;
-import com.cloud.agent.api.CreateVMSnapshotAnswer;
-import com.cloud.agent.api.CreateVMSnapshotCommand;
-import com.cloud.agent.api.CreateVolumeFromSnapshotAnswer;
-import com.cloud.agent.api.CreateVolumeFromSnapshotCommand;
-import com.cloud.agent.api.DeleteStoragePoolCommand;
-import com.cloud.agent.api.DeleteVMSnapshotAnswer;
-import com.cloud.agent.api.DeleteVMSnapshotCommand;
-import com.cloud.agent.api.GetDomRVersionAnswer;
-import com.cloud.agent.api.GetDomRVersionCmd;
-import com.cloud.agent.api.GetHostStatsAnswer;
-import com.cloud.agent.api.GetHostStatsCommand;
-import com.cloud.agent.api.GetStorageStatsAnswer;
-import com.cloud.agent.api.GetStorageStatsCommand;
-import com.cloud.agent.api.GetVmStatsAnswer;
-import com.cloud.agent.api.GetVmStatsCommand;
-import com.cloud.agent.api.GetVncPortAnswer;
-import com.cloud.agent.api.GetVncPortCommand;
-import com.cloud.agent.api.HostStatsEntry;
-import com.cloud.agent.api.MaintainAnswer;
-import com.cloud.agent.api.MaintainCommand;
-import com.cloud.agent.api.ManageSnapshotAnswer;
-import com.cloud.agent.api.ManageSnapshotCommand;
-import com.cloud.agent.api.MigrateAnswer;
-import com.cloud.agent.api.MigrateCommand;
-import com.cloud.agent.api.ModifySshKeysCommand;
-import com.cloud.agent.api.ModifyStoragePoolAnswer;
-import com.cloud.agent.api.ModifyStoragePoolCommand;
-import com.cloud.agent.api.NetworkRulesSystemVmCommand;
-import com.cloud.agent.api.NetworkRulesVmSecondaryIpCommand;
-import com.cloud.agent.api.PingCommand;
-import com.cloud.agent.api.PingRoutingCommand;
-import com.cloud.agent.api.PingRoutingWithNwGroupsCommand;
-import com.cloud.agent.api.PingRoutingWithOvsCommand;
-import com.cloud.agent.api.PingTestCommand;
-import com.cloud.agent.api.PlugNicAnswer;
-import com.cloud.agent.api.PlugNicCommand;
-import com.cloud.agent.api.PoolEjectCommand;
-import com.cloud.agent.api.PrepareForMigrationAnswer;
-import com.cloud.agent.api.PrepareForMigrationCommand;
-import com.cloud.agent.api.ReadyAnswer;
-import com.cloud.agent.api.ReadyCommand;
-import com.cloud.agent.api.RebootAnswer;
-import com.cloud.agent.api.RebootCommand;
-import com.cloud.agent.api.RebootRouterCommand;
-import com.cloud.agent.api.RevertToVMSnapshotAnswer;
-import com.cloud.agent.api.RevertToVMSnapshotCommand;
-import com.cloud.agent.api.SecurityGroupRuleAnswer;
-import com.cloud.agent.api.SecurityGroupRulesCmd;
-import com.cloud.agent.api.SetupAnswer;
-import com.cloud.agent.api.SetupCommand;
-import com.cloud.agent.api.SetupGuestNetworkAnswer;
-import com.cloud.agent.api.SetupGuestNetworkCommand;
-import com.cloud.agent.api.StartAnswer;
-import com.cloud.agent.api.StartCommand;
-import com.cloud.agent.api.StartupCommand;
-import com.cloud.agent.api.StartupRoutingCommand;
-import com.cloud.agent.api.StartupStorageCommand;
-import com.cloud.agent.api.StopAnswer;
-import com.cloud.agent.api.StopCommand;
-import com.cloud.agent.api.StoragePoolInfo;
-import com.cloud.agent.api.UnPlugNicAnswer;
-import com.cloud.agent.api.UnPlugNicCommand;
-import com.cloud.agent.api.UpdateHostPasswordCommand;
-import com.cloud.agent.api.UpgradeSnapshotCommand;
-import com.cloud.agent.api.VmStatsEntry;
+import com.cloud.agent.api.*;
 import com.cloud.agent.api.check.CheckSshAnswer;
 import com.cloud.agent.api.check.CheckSshCommand;
 import com.cloud.agent.api.proxy.CheckConsoleProxyLoadCommand;
 import com.cloud.agent.api.proxy.ConsoleProxyLoadAnswer;
 import com.cloud.agent.api.proxy.WatchConsoleProxyLoadCommand;
-import com.cloud.agent.api.routing.DhcpEntryCommand;
-import com.cloud.agent.api.routing.IpAssocAnswer;
-import com.cloud.agent.api.routing.IpAssocCommand;
-import com.cloud.agent.api.routing.IpAssocVpcCommand;
-import com.cloud.agent.api.routing.LoadBalancerConfigCommand;
-import com.cloud.agent.api.routing.NetworkElementCommand;
-import com.cloud.agent.api.routing.RemoteAccessVpnCfgCommand;
-import com.cloud.agent.api.routing.SavePasswordCommand;
-import com.cloud.agent.api.routing.SetFirewallRulesAnswer;
-import com.cloud.agent.api.routing.SetFirewallRulesCommand;
-import com.cloud.agent.api.routing.SetNetworkACLAnswer;
-import com.cloud.agent.api.routing.SetNetworkACLCommand;
-import com.cloud.agent.api.routing.SetPortForwardingRulesAnswer;
-import com.cloud.agent.api.routing.SetPortForwardingRulesCommand;
-import com.cloud.agent.api.routing.SetPortForwardingRulesVpcCommand;
-import com.cloud.agent.api.routing.SetSourceNatAnswer;
-import com.cloud.agent.api.routing.SetSourceNatCommand;
-import com.cloud.agent.api.routing.SetStaticNatRulesAnswer;
-import com.cloud.agent.api.routing.SetStaticNatRulesCommand;
-import com.cloud.agent.api.routing.SetStaticRouteAnswer;
-import com.cloud.agent.api.routing.SetStaticRouteCommand;
-import com.cloud.agent.api.routing.Site2SiteVpnCfgCommand;
-import com.cloud.agent.api.routing.VmDataCommand;
-import com.cloud.agent.api.routing.VpnUsersCfgCommand;
-import com.cloud.agent.api.storage.CopyVolumeAnswer;
-import com.cloud.agent.api.storage.CopyVolumeCommand;
-import com.cloud.agent.api.storage.CreateAnswer;
-import com.cloud.agent.api.storage.CreateCommand;
-import com.cloud.agent.api.storage.CreatePrivateTemplateAnswer;
-import com.cloud.agent.api.storage.DestroyCommand;
-import com.cloud.agent.api.storage.PrimaryStorageDownloadAnswer;
-import com.cloud.agent.api.storage.PrimaryStorageDownloadCommand;
-import com.cloud.agent.api.storage.ResizeVolumeAnswer;
-import com.cloud.agent.api.storage.ResizeVolumeCommand;
-import com.cloud.agent.api.to.IpAddressTO;
-import com.cloud.agent.api.to.NicTO;
-import com.cloud.agent.api.to.PortForwardingRuleTO;
-import com.cloud.agent.api.to.S3TO;
-import com.cloud.agent.api.to.StaticNatRuleTO;
-import com.cloud.agent.api.to.StorageFilerTO;
-import com.cloud.agent.api.to.SwiftTO;
-import com.cloud.agent.api.to.VirtualMachineTO;
-import com.cloud.agent.api.to.VolumeTO;
+import com.cloud.agent.api.routing.*;
+import com.cloud.agent.api.storage.*;
+import com.cloud.agent.api.to.*;
 import com.cloud.exception.InternalErrorException;
 import com.cloud.host.Host.Type;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
-import com.cloud.network.HAProxyConfigurator;
-import com.cloud.network.LoadBalancerConfigurator;
-import com.cloud.network.Networks;
+import com.cloud.network.*;
 import com.cloud.network.Networks.BroadcastDomainType;
 import com.cloud.network.Networks.IsolationType;
 import com.cloud.network.Networks.TrafficType;
-import com.cloud.network.PhysicalNetworkSetupInfo;
-import com.cloud.network.ovs.OvsCreateGreTunnelAnswer;
-import com.cloud.network.ovs.OvsCreateGreTunnelCommand;
-import com.cloud.network.ovs.OvsCreateTunnelAnswer;
-import com.cloud.network.ovs.OvsCreateTunnelCommand;
-import com.cloud.network.ovs.OvsDeleteFlowCommand;
-import com.cloud.network.ovs.OvsDestroyBridgeCommand;
-import com.cloud.network.ovs.OvsDestroyTunnelCommand;
-import com.cloud.network.ovs.OvsFetchInterfaceAnswer;
-import com.cloud.network.ovs.OvsFetchInterfaceCommand;
-import com.cloud.network.ovs.OvsSetTagAndFlowAnswer;
-import com.cloud.network.ovs.OvsSetTagAndFlowCommand;
-import com.cloud.network.ovs.OvsSetupBridgeCommand;
+import com.cloud.network.ovs.*;
+import com.cloud.network.rules.FirewallRule;
 import com.cloud.resource.ServerResource;
 import com.cloud.resource.hypervisor.HypervisorResource;
 import com.cloud.storage.Storage;
@@ -235,11 +45,7 @@ import com.cloud.storage.Volume;
 import com.cloud.storage.VolumeVO;
 import com.cloud.storage.template.TemplateInfo;
 import com.cloud.template.VirtualMachineTemplate.BootloaderType;
-import com.cloud.utils.NumbersUtil;
-import com.cloud.utils.Pair;
-import com.cloud.utils.S3Utils;
-import com.cloud.utils.StringUtils;
-import com.cloud.utils.Ternary;
+import com.cloud.utils.*;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.NetUtils;
 import com.cloud.vm.DiskProfile;
@@ -247,38 +53,33 @@ import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachine.State;
 import com.cloud.vm.snapshot.VMSnapshot;
 import com.trilead.ssh2.SCPClient;
-import com.xensource.xenapi.Bond;
-import com.xensource.xenapi.Connection;
+import com.xensource.xenapi.*;
 import com.xensource.xenapi.Console;
-import com.xensource.xenapi.Host;
-import com.xensource.xenapi.HostCpu;
-import com.xensource.xenapi.HostMetrics;
 import com.xensource.xenapi.Network;
-import com.xensource.xenapi.PBD;
-import com.xensource.xenapi.PIF;
 import com.xensource.xenapi.PIF.Record;
-import com.xensource.xenapi.Pool;
-import com.xensource.xenapi.SR;
-import com.xensource.xenapi.Session;
-import com.xensource.xenapi.Task;
-import com.xensource.xenapi.Types;
-import com.xensource.xenapi.Types.BadAsyncResult;
-import com.xensource.xenapi.Types.BadServerResponse;
-import com.xensource.xenapi.Types.ConsoleProtocol;
-import com.xensource.xenapi.Types.IpConfigurationMode;
-import com.xensource.xenapi.Types.OperationNotAllowed;
-import com.xensource.xenapi.Types.SrFull;
-import com.xensource.xenapi.Types.VbdType;
-import com.xensource.xenapi.Types.VmBadPowerState;
-import com.xensource.xenapi.Types.VmPowerState;
-import com.xensource.xenapi.Types.XenAPIException;
-import com.xensource.xenapi.VBD;
-import com.xensource.xenapi.VDI;
-import com.xensource.xenapi.VIF;
-import com.xensource.xenapi.VLAN;
-import com.xensource.xenapi.VM;
-import com.xensource.xenapi.VMGuestMetrics;
-import com.xensource.xenapi.XenAPIObject;
+import com.xensource.xenapi.Types.*;
+import org.apache.cloudstack.storage.command.StorageSubSystemCommand;
+import org.apache.log4j.Logger;
+import org.apache.xmlrpc.XmlRpcException;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
+import javax.ejb.Local;
+import javax.naming.ConfigurationException;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.beans.BeanInfo;
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
+import java.io.*;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.*;
 
 /**
  * CitrixResourceBase encapsulates the calls to the XenServer Xapi process
@@ -460,6 +261,12 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
             return execute((SavePasswordCommand) cmd);
         } else if (clazz == DhcpEntryCommand.class) {
             return execute((DhcpEntryCommand) cmd);
+        } else if (clazz == IpAliasCommand.class) {
+            return execute((IpAliasCommand) cmd);
+        } else if (clazz == DnsMasqConfigCommand.class) {
+            return execute((DnsMasqConfigCommand) cmd);
+        } else if (clazz == DeleteIpAliasCommand.class) {
+            return execute((DeleteIpAliasCommand) cmd);
         } else if (clazz == VmDataCommand.class) {
             return execute((VmDataCommand) cmd);
         } else if (clazz == ReadyCommand.class) {
@@ -1889,6 +1696,68 @@ public abstract class CitrixResourceBase implements ServerResource, HypervisorRe
         return new Answer(cmd);
     }
 
+    protected Answer execute(final IpAliasCommand cmd) {
+        Connection conn = getConnection();
+        String routerIp = cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP);
+        List<IpAliasTO> ipAliasTOs = cmd.getIpAliasList();
+        String args=routerIp+" ";
+        for (IpAliasTO ipaliasto : ipAliasTOs) {
+            args = args + ipaliasto.getAlias_count()+":"+ipaliasto.getRouterip()+":"+ipaliasto.getNetmask()+"-";
+        }
+        String result = callHostPlugin(conn, "vmops", "createipAlias", "args", args);
+        if (result == null || result.isEmpty()) {
+            return new Answer(cmd, false, "CreateIPAliasCommand failed\n");
+        }
+
+        return  new Answer(cmd);
+    }
+
+    protected Answer execute(final DeleteIpAliasCommand cmd) {
+        Connection conn = getConnection();
+        String routerIp = cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP);
+        List<IpAliasTO> revokedIpAliasTOs = cmd.getDeleteIpAliasTos();
+        String args=routerIp+" ";
+        for (IpAliasTO ipAliasTO : revokedIpAliasTOs) {
+            args = args + ipAliasTO.getAlias_count()+":"+ipAliasTO.getRouterip()+":"+ipAliasTO.getNetmask()+"-";
+        }
+        args = args + " " ;
+        List<IpAliasTO> activeIpAliasTOs = cmd.getCreateIpAliasTos();
+        for (IpAliasTO ipAliasTO : activeIpAliasTOs) {
+            args = args + ipAliasTO.getAlias_count()+":"+ipAliasTO.getRouterip()+":"+ipAliasTO.getNetmask()+"-";
+        }
+        String result = callHostPlugin(conn, "vmops", "deleteipAlias", "args", args);
+        if (result == null || result.isEmpty()) {
+            return new Answer(cmd, false, "DeleteipAliasCommand failed\n");
+        }
+
+        return  new Answer(cmd);
+    }
+
+    protected Answer execute(final DnsMasqConfigCommand cmd) {
+        Connection conn = getConnection();
+        String routerIp = cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP);
+        DnsMasqConfigurator configurator = new DnsMasqConfigurator();
+        String [] config = configurator.generateConfiguration(cmd);
+        String tmpConfigFilePath = "/tmp/"+ routerIp.replace(".","-")+".cfg";
+        String tmpConfigFileContents = "";
+        for (int i = 0; i < config.length; i++) {
+            tmpConfigFileContents += config[i];
+            tmpConfigFileContents += "\n";
+        }
+
+        String result = callHostPlugin(conn, "vmops", "createFileInDomr", "filepath", tmpConfigFilePath, "filecontents", tmpConfigFileContents, "domrip" ,routerIp);
+        if (result == null || result.isEmpty()) {
+            return new Answer(cmd, false, "DnsMasqConfigCommand failed to create DnsMasq cfg file.");
+        }
+        result = callHostPlugin(conn, "vmops", "configdnsmasq", "routerip", routerIp, "filepath", tmpConfigFilePath);
+
+        if (result == null || result.isEmpty()) {
+            return new Answer(cmd, false, "DnsMasqconfigCommand failed");
+        }
+
+        return new Answer(cmd);
+
+    }
     protected Answer execute(final LoadBalancerConfigCommand cmd) {
         if ( cmd.getVpcId() != null ) {
             return VPCLoadBalancerConfig(cmd);

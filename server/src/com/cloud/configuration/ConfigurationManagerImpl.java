@@ -16,105 +16,35 @@
 // under the License.
 package com.cloud.configuration;
 
-import java.net.URI;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
-import javax.ejb.Local;
-import javax.inject.Inject;
-import javax.naming.ConfigurationException;
-import javax.naming.Context;
-import javax.naming.NamingException;
-import javax.naming.directory.DirContext;
-import javax.naming.directory.InitialDirContext;
-
-import com.cloud.dc.*;
-import com.cloud.dc.dao.*;
-import com.cloud.user.*;
-import com.cloud.event.UsageEventUtils;
-import org.apache.cloudstack.acl.SecurityChecker;
-import org.apache.cloudstack.api.ApiConstants.LDAPParams;
-import org.apache.cloudstack.api.command.admin.config.UpdateCfgCmd;
-import org.apache.cloudstack.api.command.admin.ldap.LDAPConfigCmd;
-import org.apache.cloudstack.api.command.admin.ldap.LDAPRemoveCmd;
-import org.apache.cloudstack.api.command.admin.network.CreateNetworkOfferingCmd;
-import org.apache.cloudstack.api.command.admin.network.DeleteNetworkOfferingCmd;
-import org.apache.cloudstack.api.command.admin.network.UpdateNetworkOfferingCmd;
-import org.apache.cloudstack.api.command.admin.offering.CreateDiskOfferingCmd;
-import org.apache.cloudstack.api.command.admin.offering.CreateServiceOfferingCmd;
-import org.apache.cloudstack.api.command.admin.offering.DeleteDiskOfferingCmd;
-import org.apache.cloudstack.api.command.admin.offering.DeleteServiceOfferingCmd;
-import org.apache.cloudstack.api.command.admin.offering.UpdateDiskOfferingCmd;
-import org.apache.cloudstack.api.command.admin.offering.UpdateServiceOfferingCmd;
-import org.apache.cloudstack.api.command.admin.pod.DeletePodCmd;
-import org.apache.cloudstack.api.command.admin.pod.UpdatePodCmd;
-import org.apache.cloudstack.api.command.admin.vlan.CreateVlanIpRangeCmd;
-import org.apache.cloudstack.api.command.admin.vlan.DedicatePublicIpRangeCmd;
-import org.apache.cloudstack.api.command.admin.vlan.DeleteVlanIpRangeCmd;
-import org.apache.cloudstack.api.command.admin.vlan.ReleasePublicIpRangeCmd;
-import org.apache.cloudstack.api.command.admin.zone.CreateZoneCmd;
-import org.apache.cloudstack.api.command.admin.zone.DeleteZoneCmd;
-import org.apache.cloudstack.api.command.admin.zone.UpdateZoneCmd;
-import org.apache.cloudstack.api.command.user.network.ListNetworkOfferingsCmd;
-import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
-import org.apache.cloudstack.storage.datastore.db.StoragePoolDetailVO;
-import org.apache.cloudstack.storage.datastore.db.StoragePoolDetailsDao;
-import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
-import org.apache.log4j.Logger;
-import org.springframework.stereotype.Component;
-
 import com.cloud.alert.AlertManager;
 import com.cloud.api.ApiDBUtils;
 import com.cloud.capacity.dao.CapacityDao;
 import com.cloud.configuration.Resource.ResourceType;
 import com.cloud.configuration.dao.ConfigurationDao;
+import com.cloud.dc.*;
 import com.cloud.dc.DataCenter.NetworkType;
 import com.cloud.dc.Vlan.VlanType;
+import com.cloud.dc.dao.*;
 import com.cloud.deploy.DataCenterDeployment;
 import com.cloud.domain.Domain;
 import com.cloud.domain.DomainVO;
 import com.cloud.domain.dao.DomainDao;
 import com.cloud.event.ActionEvent;
 import com.cloud.event.EventTypes;
-import com.cloud.exception.ConcurrentOperationException;
-import com.cloud.exception.InsufficientCapacityException;
-import com.cloud.exception.InvalidParameterValueException;
-import com.cloud.exception.PermissionDeniedException;
-import com.cloud.exception.ResourceAllocationException;
-import com.cloud.exception.ResourceUnavailableException;
+import com.cloud.event.UsageEventUtils;
+import com.cloud.exception.*;
 import com.cloud.host.HostVO;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
-import com.cloud.network.Network;
+import com.cloud.network.*;
 import com.cloud.network.Network.Capability;
 import com.cloud.network.Network.GuestType;
 import com.cloud.network.Network.Provider;
 import com.cloud.network.Network.Service;
-import com.cloud.network.NetworkManager;
-import com.cloud.network.NetworkModel;
-import com.cloud.network.NetworkService;
 import com.cloud.network.Networks.BroadcastDomainType;
 import com.cloud.network.Networks.TrafficType;
-import com.cloud.network.PhysicalNetwork;
-import com.cloud.network.dao.FirewallRulesDao;
-import com.cloud.network.dao.IPAddressDao;
-import com.cloud.network.dao.IPAddressVO;
-import com.cloud.network.dao.NetworkDao;
-import com.cloud.network.dao.NetworkVO;
-import com.cloud.network.dao.PhysicalNetworkDao;
-import com.cloud.network.dao.PhysicalNetworkTrafficTypeDao;
-import com.cloud.network.dao.PhysicalNetworkTrafficTypeVO;
-import com.cloud.network.dao.PhysicalNetworkVO;
+import com.cloud.network.addr.PublicIp;
+import com.cloud.network.dao.*;
+import com.cloud.network.element.DhcpServiceProvider;
 import com.cloud.network.vpc.VpcManager;
 import com.cloud.offering.DiskOffering;
 import com.cloud.offering.NetworkOffering;
@@ -140,6 +70,7 @@ import com.cloud.storage.s3.S3Manager;
 import com.cloud.storage.secondary.SecondaryStorageVmManager;
 import com.cloud.storage.swift.SwiftManager;
 import com.cloud.test.IPRangeConfig;
+import com.cloud.user.*;
 import com.cloud.user.dao.AccountDao;
 import com.cloud.utils.NumbersUtil;
 import com.cloud.utils.StringUtils;
@@ -151,10 +82,51 @@ import com.cloud.utils.db.SearchCriteria;
 import com.cloud.utils.db.Transaction;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.NetUtils;
+import com.cloud.vm.NicIpAlias;
 import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.dao.NicDao;
-
+import com.cloud.vm.dao.NicIpAliasDao;
+import com.cloud.vm.dao.NicIpAliasVO;
+import com.cloud.vm.dao.NicSecondaryIpDao;
 import edu.emory.mathcs.backport.java.util.Arrays;
+import org.apache.cloudstack.acl.SecurityChecker;
+import org.apache.cloudstack.api.ApiConstants.LDAPParams;
+import org.apache.cloudstack.api.command.admin.config.UpdateCfgCmd;
+import org.apache.cloudstack.api.command.admin.ldap.LDAPConfigCmd;
+import org.apache.cloudstack.api.command.admin.ldap.LDAPRemoveCmd;
+import org.apache.cloudstack.api.command.admin.network.CreateNetworkOfferingCmd;
+import org.apache.cloudstack.api.command.admin.network.DeleteNetworkOfferingCmd;
+import org.apache.cloudstack.api.command.admin.network.UpdateNetworkOfferingCmd;
+import org.apache.cloudstack.api.command.admin.offering.*;
+import org.apache.cloudstack.api.command.admin.pod.DeletePodCmd;
+import org.apache.cloudstack.api.command.admin.pod.UpdatePodCmd;
+import org.apache.cloudstack.api.command.admin.vlan.CreateVlanIpRangeCmd;
+import org.apache.cloudstack.api.command.admin.vlan.DedicatePublicIpRangeCmd;
+import org.apache.cloudstack.api.command.admin.vlan.DeleteVlanIpRangeCmd;
+import org.apache.cloudstack.api.command.admin.vlan.ReleasePublicIpRangeCmd;
+import org.apache.cloudstack.api.command.admin.zone.CreateZoneCmd;
+import org.apache.cloudstack.api.command.admin.zone.DeleteZoneCmd;
+import org.apache.cloudstack.api.command.admin.zone.UpdateZoneCmd;
+import org.apache.cloudstack.api.command.user.network.ListNetworkOfferingsCmd;
+import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
+import org.apache.cloudstack.storage.datastore.db.StoragePoolDetailVO;
+import org.apache.cloudstack.storage.datastore.db.StoragePoolDetailsDao;
+import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Component;
+
+import javax.ejb.Local;
+import javax.inject.Inject;
+import javax.naming.ConfigurationException;
+import javax.naming.Context;
+import javax.naming.NamingException;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
+import java.net.URI;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.*;
 
 @Component
 @Local(value = { ConfigurationManager.class, ConfigurationService.class })
@@ -245,6 +217,11 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
     AccountDetailsDao _accountDetailsDao;
     @Inject
     PrimaryDataStoreDao _storagePoolDao;
+    @Inject
+    NicSecondaryIpDao _nicSecondaryIpDao;
+    @Inject
+    NicIpAliasDao _nicIpAliasDao;
+
 
     // FIXME - why don't we have interface for DataCenterLinkLocalIpAddressDao?
     @Inject protected DataCenterLinkLocalIpAddressDao _LinkLocalIpAllocDao;
@@ -2210,8 +2187,8 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
         Long podId = cmd.getPodId();
         String startIP = cmd.getStartIp();
         String endIP = cmd.getEndIp();
-        String vlanGateway = cmd.getGateway();
-        String vlanNetmask = cmd.getNetmask();
+        String newVlanGateway = cmd.getGateway();
+        String newVlanNetmask = cmd.getNetmask();
         Long userId = UserContext.current().getCallerUserId();
         String vlanId = cmd.getVlan();
         Boolean forVirtualNetwork = cmd.isForVirtualNetwork();
@@ -2369,6 +2346,7 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
             }
         }
 
+        boolean sameSubnet=false;
         // Can add vlan range only to the network which allows it
         if (!network.getSpecifyIpRanges()) {
             throw new InvalidParameterValueException("Network " + network + " doesn't support adding ip ranges");
@@ -2380,44 +2358,30 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
                     throw new InvalidParameterValueException("Can execute createVLANIpRanges on shared guest network, but type of this guest network "
                             + network.getId() + " is " + network.getGuestType());
                 }
+
                 List<VlanVO> vlans = _vlanDao.listVlansByNetworkId(network.getId());
+                VlanVO vlan = vlans.get(0);
                 if ( vlans != null && vlans.size() > 0 ) {
-                    VlanVO vlan = vlans.get(0);
                     if ( vlanId == null ) {
                         vlanId = vlan.getVlanTag();
                     } else if ( vlan.getVlanTag() != vlanId ) {
                         throw new InvalidParameterValueException("there is already one vlan " + vlan.getVlanTag() + " on network :" +
                                 + network.getId() + ", only one vlan is allowed on guest network");
                     }
-                    if (ipv4) {
-                        vlanGateway = vlan.getVlanGateway();
-                        vlanNetmask = vlan.getVlanNetmask();
-                        // Check if ip addresses are in network range
-                        if (!NetUtils.sameSubnet(startIP, vlanGateway, vlanNetmask)) {
-                            throw new InvalidParameterValueException("Start ip is not in vlan range!");
-                        }
-                        if (!NetUtils.sameSubnet(endIP, vlanGateway, vlanNetmask)) {
-                            throw new InvalidParameterValueException("End ip is not in vlan range!");
-                        }
-                    }
-                    if (ipv6) {
-                        if (ip6Gateway != null && !ip6Gateway.equals(network.getIp6Gateway())) {
-                            throw new InvalidParameterValueException("The input gateway " + ip6Gateway + " is not same as network gateway " + network.getIp6Gateway());
-                        }
-                        if (ip6Cidr != null && !ip6Cidr.equals(network.getIp6Cidr())) {
-                            throw new InvalidParameterValueException("The input cidr " + ip6Cidr + " is not same as network ciddr " + network.getIp6Cidr());
-                        }
-                        ip6Gateway = network.getIp6Gateway();
-                        ip6Cidr = network.getIp6Cidr();
-                        _networkModel.checkIp6Parameters(startIPv6, endIPv6, ip6Gateway, ip6Cidr);
-                    }
                 }
-            } else if (network.getTrafficType() == TrafficType.Management) {
-                throw new InvalidParameterValueException("Cannot execute createVLANIpRanges on management network");
+               sameSubnet=validateIpRange(startIP, endIP, newVlanGateway, newVlanNetmask, vlans, ipv4, ipv6, ip6Gateway, ip6Cidr,startIPv6, endIPv6, network);
+
             }
+
+        } else if (network.getTrafficType() == TrafficType.Management) {
+                      throw new InvalidParameterValueException("Cannot execute createVLANIpRanges on management network");
+        }
+        else if (zone.getNetworkType() == NetworkType.Basic){
+                 List<VlanVO> vlans = _vlanDao.listVlansByNetworkId(network.getId());
+                 sameSubnet=validateIpRange(startIP,endIP,newVlanGateway, newVlanNetmask, vlans, ipv4, ipv6, ip6Gateway, ip6Cidr, startIPv6, endIPv6, network);
         }
 
-        if (zoneId == null || (ipv4 && (vlanGateway == null || vlanNetmask == null)) || (ipv6 && (ip6Gateway == null || ip6Cidr == null))) {
+        if (zoneId == null || (ipv4 && (newVlanGateway == null || newVlanNetmask == null)) || (ipv6 && (ip6Gateway == null || ip6Cidr == null))) {
             throw new InvalidParameterValueException("Gateway, netmask and zoneId have to be passed in for virtual and direct untagged networks");
         }
 
@@ -2430,7 +2394,6 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
                 _resourceLimitMgr.checkResourceLimit(vlanOwner, ResourceType.public_ip, accountIpRange);
             }
         }
-
         // Check if the IP range overlaps with the private ip
         if (ipv4) {
         	checkOverlapPrivateIpRange(zoneId, startIP, endIP);
@@ -2439,11 +2402,79 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
         txn.start();
 
         Vlan vlan = createVlanAndPublicIpRange(zoneId, networkId, physicalNetworkId, forVirtualNetwork, podId, startIP, 
-                endIP, vlanGateway, vlanNetmask, vlanId, vlanOwner, startIPv6, endIPv6, ip6Gateway, ip6Cidr);
+                endIP, newVlanGateway, newVlanNetmask, vlanId, vlanOwner, startIPv6, endIPv6, ip6Gateway, ip6Cidr);
+        //create an entry in the nic_secondary table. This will be the new gateway that will be configured on the corresponding routervm.
+        if (sameSubnet == false) {
+           s_logger.info("adding a new subnet to the network "+network.getId());
+        }
 
         txn.commit();
 
         return vlan;
+    }
+
+    public boolean validateIpRange(String startIP, String endIP, String newVlanGateway, String newVlanNetmask, List<VlanVO> vlans, boolean ipv4, boolean ipv6, String ip6Gateway, String ip6Cidr, String startIPv6, String endIPv6, Network network) {
+        String vlanGateway;
+        String vlanNetmask;
+        boolean sameSubnet = false;
+        if ( vlans != null && vlans.size() > 0 ) {
+
+            for (VlanVO vlan : vlans) {
+                if (ipv4) {
+                    vlanGateway = vlan.getVlanGateway();
+                    vlanNetmask = vlan.getVlanNetmask();
+                    // Check if ip addresses are in network range
+                    if (!NetUtils.sameSubnet(startIP, vlanGateway, vlanNetmask)) {
+                        if (!NetUtils.sameSubnet(endIP, vlanGateway, vlanNetmask)) {
+                            if (newVlanNetmask!= null){
+                                // if netmask is not null we assume that the user is trying to add a new subnet and validate the new subnet.
+
+                                // check if the the new subnet is not a superset of the existing subnets.
+                                if (NetUtils.isNetworkAWithinNetworkB(NetUtils.getCidrFromGatewayAndNetmask(vlanGateway,vlanNetmask), NetUtils.ipAndNetMaskToCidr(startIP, newVlanNetmask))){
+                                    throw new InvalidParameterValueException ("The new subnet is a super set of the existing subnet");
+                                }
+                                // check if the new subnet is not a subset of the existing subnet.
+                                if (NetUtils.isNetworkAWithinNetworkB(NetUtils.ipAndNetMaskToCidr(startIP, newVlanNetmask), NetUtils.getCidrFromGatewayAndNetmask(vlanGateway,vlanNetmask))){
+                                    throw  new InvalidParameterValueException("The new subnet is a subset of the existing subnet");
+                                }
+                            }
+                            //dose not belong to this subnet check with other subnets.
+                            continue;
+                        }
+                    }else if (NetUtils.sameSubnet(endIP, vlanGateway, vlanNetmask)){
+                        // trying to add to the same subnet.
+                        sameSubnet = true;
+                        if (newVlanGateway == null) {
+                            newVlanGateway = vlanGateway;
+                        }
+                        if (!newVlanGateway.equals(vlanGateway)){
+                            throw new InvalidParameterValueException("The gateway of the ip range is not same as the gateway of the subnet.");
+                        }
+                        break;
+                    }
+                    else {
+                        throw new InvalidParameterValueException("Start ip and End ip is not in vlan range!");
+                    }
+                }
+                if (ipv6) {
+                    if (ip6Gateway != null && !ip6Gateway.equals(network.getIp6Gateway())) {
+                       throw new InvalidParameterValueException("The input gateway " + ip6Gateway + " is not same as network gateway " + network.getIp6Gateway());
+                    }
+                    if (ip6Cidr != null && !ip6Cidr.equals(network.getIp6Cidr())) {
+                       throw new InvalidParameterValueException("The input cidr " + ip6Cidr + " is not same as network ciddr " + network.getIp6Cidr());
+                    }
+                    ip6Gateway = network.getIp6Gateway();
+                    ip6Cidr = network.getIp6Cidr();
+                    _networkModel.checkIp6Parameters(startIPv6, endIPv6, ip6Gateway, ip6Cidr);
+                }
+            }
+            if (sameSubnet == false) {
+                if (newVlanGateway ==null)  {
+                    throw  new MissingParameterValueException("The gateway for the new subnet is not specified.");
+                }
+            }
+        }
+        return  sameSubnet;
     }
 
     @Override
@@ -2665,20 +2696,6 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
             throw new InvalidParameterValueException("The VLAN tag " + vlanId + " is already being used for the guest network in zone " + zone.getName());
         }
 
-        // For untagged vlan check if vlan per pod already exists. If yes,
-        // verify that new vlan range has the same netmask and gateway
-        if (zone.getNetworkType() == NetworkType.Basic && vlanId.equalsIgnoreCase(Vlan.UNTAGGED) && podId != null) {
-            List<VlanVO> podVlans = _vlanDao.listVlansForPodByType(podId, VlanType.DirectAttached);
-            if (podVlans != null && !podVlans.isEmpty()) {
-                VlanVO podVlan = podVlans.get(0);
-                if (!podVlan.getVlanNetmask().equals(vlanNetmask)) {
-                    throw new InvalidParameterValueException("Vlan netmask is different from the netmask of Untagged vlan id=" + podVlan.getId() + " existing in the pod " + podId);
-                } else if (!podVlan.getVlanGateway().equals(vlanGateway)) {
-                    throw new InvalidParameterValueException("Vlan gateway is different from the gateway of Untagged vlan id=" + podVlan.getId() + " existing in the pod " + podId);
-                }
-            }
-        }
-
         String ipRange = null;
         
         if (ipv4) {
@@ -2728,7 +2745,7 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
 
     @Override
     @DB
-    public boolean deleteVlanAndPublicIpRange(long userId, long vlanDbId, Account caller) {
+    public boolean deleteVlanAndPublicIpRange(long userId, long vlanDbId, Account caller)  {
         VlanVO vlan = _vlanDao.findById(vlanDbId);
         if (vlan == null) {
             throw new InvalidParameterValueException("Please specify a valid IP range id.");
@@ -2782,17 +2799,11 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
                 } finally {
                     _vlanDao.releaseFromLockTable(vlanDbId);
                 } 
-            } else {
-                throw new InvalidParameterValueException("The IP range can't be deleted because it has allocated public IP addresses.");
             }
         }
 
         if (success) {
             // Delete all public IPs in the VLAN
-            if (!deletePublicIPRange(vlanDbId)) {
-                return false;
-            }
-
             // if ip range is dedicated to an account generate usage events for release of every ip in the range
             if(isAccountSpecific) {
                 for (IPAddressVO ip : ips) {
@@ -2801,13 +2812,115 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
                             ip.getSystem(), ip.getClass().getName(), ip.getUuid());
                 }
             }
+            if (_networkModel.areServicesSupportedInNetwork(vlan.getNetworkId(), Service.Dhcp)) {
+                Network network = _networkDao.findById(vlan.getNetworkId());
+                DhcpServiceProvider dhcpServiceProvider = _networkMgr.getDhcpServiceProvider(network);
+                if (!dhcpServiceProvider.getProvider().getName().equalsIgnoreCase(Provider.VirtualRouter.getName())) {
+                    if (!deletePublicIPRange(vlanDbId)) {
+                        return false;
+                    }
+                    _vlanDao.expunge(vlanDbId);
+                    return  true;
+                }
+                //search if the vlan has any allocated ips.
+                boolean aliasIpBelongsToThisVlan = false;
+                long freeIpsInsubnet = 0;
+                NicIpAliasVO ipAlias = null;
+                allocIpCount = _publicIpAddressDao.countIPs(vlan.getDataCenterId(), vlanDbId, true);
+                if (allocIpCount > 1) {
+                    throw  new InvalidParameterValueException ("cannot delete this range as some of the vlans are in use.");
+                }
+                if (allocIpCount == 0){
+                    //remove the vlan range.
+                    if (!deletePublicIPRange(vlanDbId)) {
+                        return false;
+                    }
+                    _vlanDao.expunge(vlanDbId);
+                }
+                //check if this allocated ip is being used as an ipAlias on the router.
+                ipAlias = _nicIpAliasDao.findByGatewayAndNetworkIdAndState(vlan.getVlanGateway(), vlan.getNetworkId(),  NicIpAlias.state.active);
+                //check if this ip belongs to this vlan and is allocated.
+                IPAddressVO ip = _publicIpAddressDao.findByIpAndVlanId(ipAlias.getIp4Address(), vlanDbId);
+                if (ip != null && ip.getState() == IpAddress.State.Allocated) {
+                    aliasIpBelongsToThisVlan =true;
+                    //check if there any other vlan ranges in the same subnet having free ips
+                    List<VlanVO> vlans = _vlanDao.listVlansByNetworkIdAndGateway(vlan.getNetworkId(), vlan.getVlanGateway());
+                    //if there is no other vlanrage in this subnet. free the ip and delete the vlan.
+                    if (vlans.size() == 1){
+                        boolean result = dhcpServiceProvider.removeDhcpSupportForSubnet(network);
+                        if (result == false) {
+                            s_logger.debug("could't delete the ip alias on the router. Marking revoked in the Db");
+                            ipAlias.setState(NicIpAlias.state.revoked);
+                            _nicIpAliasDao.update(ipAlias.getId(), ipAlias);
+                            return true;
+                        }
+                        else {
+                            _publicIpAddressDao.unassignIpAddress(ip.getId());
+                            if (!deletePublicIPRange(vlanDbId)) {
+                                return false;
+                            }
+                            _vlanDao.expunge(vlanDbId);
+                            _nicIpAliasDao.expunge(ipAlias.getId());
+                        }
+                    } else {
+                        // if there are more vlans in the subnet check if there are free ips.
+                        List<Long> vlanDbIdList = new ArrayList<Long>();
+                        for (VlanVO vlanrange : vlans) {
+                            if (vlanrange.getId() != vlanDbId) {
+                                vlanDbIdList.add(vlanrange.getId());
+                            }
+                        }
+                        for (VlanVO vlanrange : vlans) {
+                            if (vlanrange.getId() != vlanDbId) {
+                                freeIpsInsubnet =  _publicIpAddressDao.countFreeIpsInVlan(vlanrange.getId());
+                                if (freeIpsInsubnet > 0){
+                                    //assign one free ip to the router for creating ip Alias.
+                                    s_logger.info("vlan"+vlan.getId()+" id being deleted, one of the Ips in this range is used by the router, trying to free this ip and allocate a new one.");
+                                    Transaction txn = Transaction.currentTxn();
+                                    //changing the state to revoked so that removeDhcpSupport for subnet sses it.
+                                    ipAlias.setState(NicIpAlias.state.revoked);
+                                    _nicIpAliasDao.update(ipAlias.getId(), ipAlias);
+                                    boolean result = false;
+                                    try {
+                                        PublicIp routerPublicIP = _networkMgr.assignPublicIpAddressFromVlans(network.getDataCenterId(), null, caller, Vlan.VlanType.DirectAttached, vlanDbIdList, network.getId(), null, false);
+                                        s_logger.info("creating a db entry for the new ip alias.");
+                                        NicIpAliasVO newipAlias = new NicIpAliasVO(ipAlias.getNicId(), routerPublicIP.getAddress().addr(), ipAlias.getVmId(), ipAlias.getAccountId(), network.getDomainId(), network.getId(), ipAlias.getGateway(), ipAlias.getNetmask());
+                                        newipAlias.setAliasCount(routerPublicIP.getIpMacAddress());
+                                        _nicIpAliasDao.persist(newipAlias);
+                                        //we revoke all the rules and apply all the rules as a part of the removedhcp config. so the new ip will get configured when we delete the old ip.
 
-            // Delete the VLAN
-            return _vlanDao.expunge(vlanDbId);
-        } else {
-            return false;
+                                    }
+                                    catch (InsufficientAddressCapacityException e) {
+                                        txn.rollback();
+                                        txn.close();
+                                        throw new InvalidParameterValueException("cannot delete  vlan range"+ vlan.getId()+"one of the ips in this range is benig used to provide dhcp service. Cannot use some other ip as there are no free ips in this subnet");
+                                    }
+                                    s_logger.info("removing the old ip alias on router");
+                                    result = dhcpServiceProvider.removeDhcpSupportForSubnet(network);
+                                    if (result == false) {
+                                        s_logger.debug("could't delete the ip alias on the router");
+                                        txn.rollback();
+                                        txn.close();
+                                        return false;
+                                    }
+                                    _publicIpAddressDao.unassignIpAddress(ip.getId());
+                                    if (!deletePublicIPRange(vlanDbId)) {
+                                        return false;
+                                    }
+                                    _vlanDao.expunge(vlanDbId);
+                                    txn.close();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
         }
+        return true;
     }
+
 
     @Override
     @DB
@@ -2908,7 +3021,7 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
         return releasePublicIpRange(vlanDbId, UserContext.current().getCallerUserId(), UserContext.current().getCaller());
     }
 
-    @Override
+
     @DB
     public boolean releasePublicIpRange(long vlanDbId, long userId, Account caller) {
         VlanVO vlan = _vlanDao.findById(vlanDbId);
@@ -3279,7 +3392,7 @@ public class ConfigurationManagerImpl extends ManagerBase implements Configurati
 
     @Override
     @ActionEvent(eventType = EventTypes.EVENT_VLAN_IP_RANGE_DELETE, eventDescription = "deleting vlan ip range", async = false)
-    public boolean deleteVlanIpRange(DeleteVlanIpRangeCmd cmd) {
+    public boolean deleteVlanIpRange(DeleteVlanIpRangeCmd cmd)  {
         Long vlanDbId = cmd.getId();
 
         VlanVO vlan = _vlanDao.findById(vlanDbId);

@@ -17,25 +17,11 @@
 
 package com.cloud.vpc;
 
-import java.util.List;
-import java.util.Map;
-
-import javax.ejb.Local;
-import javax.naming.ConfigurationException;
-
-import org.apache.cloudstack.api.command.admin.router.UpgradeRouterCmd;
-import org.springframework.stereotype.Component;
-
 import com.cloud.deploy.DeployDestination;
 import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.InsufficientCapacityException;
 import com.cloud.exception.ResourceUnavailableException;
-import com.cloud.network.Network;
-import com.cloud.network.PublicIpAddress;
-import com.cloud.network.RemoteAccessVpn;
-import com.cloud.network.Site2SiteVpnConnection;
-import com.cloud.network.VpcVirtualNetworkApplianceService;
-import com.cloud.network.VpnUser;
+import com.cloud.network.*;
 import com.cloud.network.router.VirtualRouter;
 import com.cloud.network.router.VpcVirtualNetworkApplianceManager;
 import com.cloud.network.rules.FirewallRule;
@@ -46,12 +32,18 @@ import com.cloud.network.vpc.Vpc;
 import com.cloud.user.Account;
 import com.cloud.user.User;
 import com.cloud.uservm.UserVm;
-import com.cloud.utils.component.Manager;
 import com.cloud.utils.component.ManagerBase;
 import com.cloud.vm.DomainRouterVO;
 import com.cloud.vm.NicProfile;
 import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.VirtualMachineProfile.Param;
+import org.apache.cloudstack.api.command.admin.router.UpgradeRouterCmd;
+import org.springframework.stereotype.Component;
+
+import javax.ejb.Local;
+import javax.naming.ConfigurationException;
+import java.util.List;
+import java.util.Map;
 
 @Component
 @Local(value = {VpcVirtualNetworkApplianceManager.class, VpcVirtualNetworkApplianceService.class})
@@ -209,6 +201,16 @@ VpcVirtualNetworkApplianceService {
             DeployDestination dest, List<DomainRouterVO> routers) throws ResourceUnavailableException {
         // TODO Auto-generated method stub
         return false;
+    }
+
+    @Override
+    public boolean configDhcp(Network network, NicProfile nic, VirtualMachineProfile<UserVm> uservm, DeployDestination dest, List<DomainRouterVO> routers) throws ResourceUnavailableException {
+        return false;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public boolean removeDhcpSupportForSubnet(Network network, List<DomainRouterVO> routers) throws ResourceUnavailableException {
+        return false;  //To change body of implemented methods use File | Settings | File Templates.
     }
 
     /* (non-Javadoc)

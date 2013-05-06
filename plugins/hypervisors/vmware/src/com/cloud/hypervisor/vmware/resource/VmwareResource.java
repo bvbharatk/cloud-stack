@@ -16,165 +16,13 @@
 // under the License.
 package com.cloud.hypervisor.vmware.resource;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.nio.channels.SocketChannel;
-import java.rmi.RemoteException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.TimeZone;
-import java.util.UUID;
-
-import javax.naming.ConfigurationException;
-
-import org.apache.log4j.Logger;
-import org.apache.log4j.NDC;
-
 import com.cloud.agent.IAgentControl;
-import com.cloud.agent.api.Answer;
-import com.cloud.agent.api.AttachIsoCommand;
-import com.cloud.agent.api.AttachVolumeAnswer;
-import com.cloud.agent.api.AttachVolumeCommand;
-import com.cloud.agent.api.BackupSnapshotAnswer;
-import com.cloud.agent.api.BackupSnapshotCommand;
-import com.cloud.agent.api.BumpUpPriorityCommand;
-import com.cloud.agent.api.CheckHealthAnswer;
-import com.cloud.agent.api.CheckHealthCommand;
-import com.cloud.agent.api.CheckNetworkAnswer;
-import com.cloud.agent.api.CheckNetworkCommand;
-import com.cloud.agent.api.CheckOnHostAnswer;
-import com.cloud.agent.api.CheckOnHostCommand;
-import com.cloud.agent.api.CheckRouterAnswer;
-import com.cloud.agent.api.CheckRouterCommand;
-import com.cloud.agent.api.CheckS2SVpnConnectionsAnswer;
-import com.cloud.agent.api.CheckS2SVpnConnectionsCommand;
-import com.cloud.agent.api.CheckVirtualMachineAnswer;
-import com.cloud.agent.api.CheckVirtualMachineCommand;
-import com.cloud.agent.api.Command;
-import com.cloud.agent.api.CreatePrivateTemplateFromSnapshotCommand;
-import com.cloud.agent.api.CreatePrivateTemplateFromVolumeCommand;
-import com.cloud.agent.api.CreateStoragePoolCommand;
-import com.cloud.agent.api.CreateVMSnapshotAnswer;
-import com.cloud.agent.api.CreateVMSnapshotCommand;
-import com.cloud.agent.api.CreateVolumeFromSnapshotAnswer;
-import com.cloud.agent.api.CreateVolumeFromSnapshotCommand;
-import com.cloud.agent.api.DeleteStoragePoolCommand;
-import com.cloud.agent.api.DeleteVMSnapshotAnswer;
-import com.cloud.agent.api.DeleteVMSnapshotCommand;
-import com.cloud.agent.api.UnregisterVMCommand;
-import com.cloud.agent.api.GetDomRVersionAnswer;
-import com.cloud.agent.api.GetDomRVersionCmd;
-import com.cloud.agent.api.GetHostStatsAnswer;
-import com.cloud.agent.api.GetHostStatsCommand;
-import com.cloud.agent.api.GetStorageStatsAnswer;
-import com.cloud.agent.api.GetStorageStatsCommand;
-import com.cloud.agent.api.GetVmStatsAnswer;
-import com.cloud.agent.api.GetVmStatsCommand;
-import com.cloud.agent.api.GetVncPortAnswer;
-import com.cloud.agent.api.GetVncPortCommand;
-import com.cloud.agent.api.HostStatsEntry;
-import com.cloud.agent.api.MaintainAnswer;
-import com.cloud.agent.api.MaintainCommand;
-import com.cloud.agent.api.ManageSnapshotAnswer;
-import com.cloud.agent.api.ManageSnapshotCommand;
-import com.cloud.agent.api.MigrateAnswer;
-import com.cloud.agent.api.MigrateCommand;
-import com.cloud.agent.api.ModifySshKeysCommand;
-import com.cloud.agent.api.ModifyStoragePoolAnswer;
-import com.cloud.agent.api.ModifyStoragePoolCommand;
-import com.cloud.agent.api.NetworkUsageAnswer;
-import com.cloud.agent.api.NetworkUsageCommand;
-import com.cloud.agent.api.PingCommand;
-import com.cloud.agent.api.PingRoutingCommand;
-import com.cloud.agent.api.PingTestCommand;
-import com.cloud.agent.api.PlugNicAnswer;
-import com.cloud.agent.api.PlugNicCommand;
-import com.cloud.agent.api.PoolEjectCommand;
-import com.cloud.agent.api.PrepareForMigrationAnswer;
-import com.cloud.agent.api.PrepareForMigrationCommand;
-import com.cloud.agent.api.ReadyAnswer;
-import com.cloud.agent.api.ReadyCommand;
-import com.cloud.agent.api.RebootAnswer;
-import com.cloud.agent.api.RebootCommand;
-import com.cloud.agent.api.RebootRouterCommand;
-import com.cloud.agent.api.RevertToVMSnapshotAnswer;
-import com.cloud.agent.api.RevertToVMSnapshotCommand;
-import com.cloud.agent.api.SetupAnswer;
-import com.cloud.agent.api.SetupCommand;
-import com.cloud.agent.api.SetupGuestNetworkAnswer;
-import com.cloud.agent.api.SetupGuestNetworkCommand;
-import com.cloud.agent.api.StartAnswer;
-import com.cloud.agent.api.StartCommand;
-import com.cloud.agent.api.StartupCommand;
-import com.cloud.agent.api.StartupRoutingCommand;
-import com.cloud.agent.api.StartupStorageCommand;
-import com.cloud.agent.api.StopAnswer;
-import com.cloud.agent.api.StopCommand;
-import com.cloud.agent.api.StoragePoolInfo;
-import com.cloud.agent.api.UnPlugNicAnswer;
-import com.cloud.agent.api.UnPlugNicCommand;
-import com.cloud.agent.api.UpgradeSnapshotCommand;
-import com.cloud.agent.api.ValidateSnapshotAnswer;
-import com.cloud.agent.api.ValidateSnapshotCommand;
-import com.cloud.agent.api.VmStatsEntry;
+import com.cloud.agent.api.*;
 import com.cloud.agent.api.check.CheckSshAnswer;
 import com.cloud.agent.api.check.CheckSshCommand;
-import com.cloud.agent.api.routing.DhcpEntryCommand;
-import com.cloud.agent.api.routing.IpAssocAnswer;
-import com.cloud.agent.api.routing.IpAssocCommand;
-import com.cloud.agent.api.routing.IpAssocVpcCommand;
-import com.cloud.agent.api.routing.LoadBalancerConfigCommand;
-import com.cloud.agent.api.routing.NetworkElementCommand;
-import com.cloud.agent.api.routing.RemoteAccessVpnCfgCommand;
-import com.cloud.agent.api.routing.SavePasswordCommand;
-import com.cloud.agent.api.routing.SetFirewallRulesAnswer;
-import com.cloud.agent.api.routing.SetFirewallRulesCommand;
-import com.cloud.agent.api.routing.SetNetworkACLAnswer;
-import com.cloud.agent.api.routing.SetNetworkACLCommand;
-import com.cloud.agent.api.routing.SetPortForwardingRulesAnswer;
-import com.cloud.agent.api.routing.SetPortForwardingRulesCommand;
-import com.cloud.agent.api.routing.SetPortForwardingRulesVpcCommand;
-import com.cloud.agent.api.routing.SetSourceNatAnswer;
-import com.cloud.agent.api.routing.SetSourceNatCommand;
-import com.cloud.agent.api.routing.SetStaticNatRulesAnswer;
-import com.cloud.agent.api.routing.SetStaticNatRulesCommand;
-import com.cloud.agent.api.routing.Site2SiteVpnCfgCommand;
-import com.cloud.agent.api.routing.VmDataCommand;
-import com.cloud.agent.api.routing.VpnUsersCfgCommand;
-import com.cloud.agent.api.storage.CopyVolumeAnswer;
-import com.cloud.agent.api.storage.CopyVolumeCommand;
-import com.cloud.agent.api.storage.CreateVolumeOVACommand;
-import com.cloud.agent.api.storage.CreateVolumeOVAAnswer;
-import com.cloud.agent.api.storage.PrepareOVAPackingAnswer;
-import com.cloud.agent.api.storage.PrepareOVAPackingCommand;
-import com.cloud.agent.api.storage.CreateAnswer;
-import com.cloud.agent.api.storage.CreateCommand;
-import com.cloud.agent.api.storage.CreatePrivateTemplateAnswer;
-import com.cloud.agent.api.storage.DestroyCommand;
-import com.cloud.agent.api.storage.PrimaryStorageDownloadAnswer;
-import com.cloud.agent.api.storage.PrimaryStorageDownloadCommand;
-import com.cloud.agent.api.storage.ResizeVolumeAnswer;
-import com.cloud.agent.api.storage.ResizeVolumeCommand;
-import com.cloud.agent.api.to.FirewallRuleTO;
-import com.cloud.agent.api.to.IpAddressTO;
-import com.cloud.agent.api.to.NicTO;
-import com.cloud.agent.api.to.PortForwardingRuleTO;
-import com.cloud.agent.api.to.StaticNatRuleTO;
-import com.cloud.agent.api.to.StorageFilerTO;
-import com.cloud.agent.api.to.VirtualMachineTO;
-import com.cloud.agent.api.to.VolumeTO;
+import com.cloud.agent.api.routing.*;
+import com.cloud.agent.api.storage.*;
+import com.cloud.agent.api.to.*;
 import com.cloud.dc.DataCenter.NetworkType;
 import com.cloud.dc.Vlan;
 import com.cloud.exception.InternalErrorException;
@@ -182,32 +30,13 @@ import com.cloud.host.Host.Type;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
 import com.cloud.hypervisor.vmware.manager.VmwareHostService;
 import com.cloud.hypervisor.vmware.manager.VmwareManager;
-import com.cloud.hypervisor.vmware.mo.ClusterMO;
-import com.cloud.hypervisor.vmware.mo.CustomFieldConstants;
-import com.cloud.hypervisor.vmware.mo.CustomFieldsManagerMO;
-import com.cloud.hypervisor.vmware.mo.DatacenterMO;
-import com.cloud.hypervisor.vmware.mo.DatastoreMO;
-import com.cloud.hypervisor.vmware.mo.DiskControllerType;
-import com.cloud.hypervisor.vmware.mo.HostFirewallSystemMO;
-import com.cloud.hypervisor.vmware.mo.HostMO;
-import com.cloud.hypervisor.vmware.mo.HypervisorHostHelper;
-import com.cloud.hypervisor.vmware.mo.NetworkDetails;
-import com.cloud.hypervisor.vmware.mo.VirtualEthernetCardType;
-import com.cloud.hypervisor.vmware.mo.VirtualMachineMO;
-import com.cloud.hypervisor.vmware.mo.VirtualSwitchType;
-import com.cloud.hypervisor.vmware.mo.VmwareHypervisorHost;
-import com.cloud.hypervisor.vmware.mo.VmwareHypervisorHostNetworkSummary;
-import com.cloud.hypervisor.vmware.mo.VmwareHypervisorHostResourceSummary;
-import com.cloud.hypervisor.vmware.resource.VmwareContextFactory;
+import com.cloud.hypervisor.vmware.mo.*;
 import com.cloud.hypervisor.vmware.util.VmwareContext;
 import com.cloud.hypervisor.vmware.util.VmwareGuestOsMapper;
 import com.cloud.hypervisor.vmware.util.VmwareHelper;
-import com.cloud.network.HAProxyConfigurator;
-import com.cloud.network.LoadBalancerConfigurator;
-import com.cloud.network.Networks;
+import com.cloud.network.*;
 import com.cloud.network.Networks.BroadcastDomainType;
 import com.cloud.network.Networks.TrafficType;
-import com.cloud.network.VmwareTrafficLabel;
 import com.cloud.network.rules.FirewallRule;
 import com.cloud.resource.ServerResource;
 import com.cloud.serializer.GsonHelper;
@@ -232,45 +61,19 @@ import com.cloud.vm.VirtualMachine.State;
 import com.cloud.vm.VirtualMachineName;
 import com.cloud.vm.VmDetailConstants;
 import com.google.gson.Gson;
-import com.vmware.vim25.AboutInfo;
-import com.vmware.vim25.ClusterDasConfigInfo;
-import com.vmware.vim25.ComputeResourceSummary;
-import com.vmware.vim25.DatastoreSummary;
-import com.vmware.vim25.DynamicProperty;
-import com.vmware.vim25.HostCapability;
-import com.vmware.vim25.HostFirewallInfo;
-import com.vmware.vim25.HostFirewallRuleset;
-import com.vmware.vim25.HostNetworkTrafficShapingPolicy;
-import com.vmware.vim25.HostPortGroupSpec;
-import com.vmware.vim25.ManagedObjectReference;
-import com.vmware.vim25.ObjectContent;
-import com.vmware.vim25.OptionValue;
-import com.vmware.vim25.PerfCounterInfo;
-import com.vmware.vim25.PerfEntityMetric;
-import com.vmware.vim25.PerfEntityMetricBase;
-import com.vmware.vim25.PerfMetricId;
-import com.vmware.vim25.PerfMetricIntSeries;
-import com.vmware.vim25.PerfMetricSeries;
-import com.vmware.vim25.PerfQuerySpec;
-import com.vmware.vim25.PerfSampleInfo;
-import com.vmware.vim25.RuntimeFault;
-import com.vmware.vim25.RuntimeFaultFaultMsg;
-import com.vmware.vim25.ToolsUnavailable;
-import com.vmware.vim25.ToolsUnavailableFaultMsg;
-import com.vmware.vim25.VimPortType;
-import com.vmware.vim25.VirtualDevice;
-import com.vmware.vim25.VirtualDeviceConfigSpec;
-import com.vmware.vim25.VirtualDeviceConfigSpecOperation;
-import com.vmware.vim25.VirtualDisk;
-import com.vmware.vim25.VirtualEthernetCard;
-import com.vmware.vim25.VirtualEthernetCardNetworkBackingInfo;
-import com.vmware.vim25.VirtualLsiLogicController;
-import com.vmware.vim25.VirtualMachineConfigSpec;
-import com.vmware.vim25.VirtualMachineFileInfo;
-import com.vmware.vim25.VirtualMachineGuestOsIdentifier;
-import com.vmware.vim25.VirtualMachinePowerState;
-import com.vmware.vim25.VirtualMachineRuntimeInfo;
-import com.vmware.vim25.VirtualSCSISharing;
+import com.vmware.vim25.*;
+import org.apache.log4j.Logger;
+import org.apache.log4j.NDC;
+
+import javax.naming.ConfigurationException;
+import java.io.File;
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.nio.channels.SocketChannel;
+import java.rmi.RemoteException;
+import java.util.*;
 
 
 public class VmwareResource implements StoragePoolResource, ServerResource, VmwareHostService {
@@ -364,6 +167,12 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
                 answer = execute((SavePasswordCommand) cmd);
             } else if (clz == DhcpEntryCommand.class) {
                 answer = execute((DhcpEntryCommand) cmd);
+            } else if (clz == IpAliasCommand.class) {
+                return execute((IpAliasCommand) cmd);
+            } else if (clz == DnsMasqConfigCommand.class) {
+                return execute((DnsMasqConfigCommand) cmd);
+            } else if (clz == DeleteIpAliasCommand.class) {
+                return execute((DeleteIpAliasCommand) cmd);
             } else if (clz == VmDataCommand.class) {
                 answer = execute((VmDataCommand) cmd);
             } else if (clz == ReadyCommand.class) {
@@ -1818,6 +1627,141 @@ public class VmwareResource implements StoragePoolResource, ServerResource, Vmwa
         }
 
         return new Answer(cmd);
+    }
+
+    protected Answer execute(final IpAliasCommand cmd) {
+        if (s_logger.isInfoEnabled()) {
+            s_logger.info("Executing createipAlias command: " + _gson.toJson(cmd));
+        }
+        String routerIp = cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP);
+        List<IpAliasTO> ipAliasTOs = cmd.getIpAliasList();
+        String args=routerIp+" ";
+        for (IpAliasTO ipaliasto : ipAliasTOs) {
+            args = args + ipaliasto.getAlias_count()+":"+ipaliasto.getRouterip()+":"+ipaliasto.getNetmask()+"-";
+        }
+        if (s_logger.isDebugEnabled()) {
+            s_logger.debug("Run command on domR " + cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP) + ", /root/createipAlias " + args);
+        }
+
+        try {
+            VmwareManager mgr = getServiceContext().getStockObject(VmwareManager.CONTEXT_STOCK_NAME);
+            String controlIp = getRouterSshControlIp(cmd);
+            Pair<Boolean, String> result = SshHelper.sshExecute(controlIp, DEFAULT_DOMR_SSHPORT, "root", mgr.getSystemVMKeyFile(), null,
+                    "/root/createipAlias.sh " + args);
+
+            if (!result.first()) {
+                s_logger.error("ipAlias command on domr " + controlIp + " failed, message: " + result.second());
+
+                return new Answer(cmd, false, "createipAlias failed due to " + result.second());
+            }
+
+            if (s_logger.isInfoEnabled()) {
+                s_logger.info("createipAlias command on domain router " + controlIp + " completed");
+            }
+
+        } catch (Throwable e) {
+            String msg = "createipAlias failed due to " + VmwareHelper.getExceptionMessage(e);
+            s_logger.error(msg, e);
+            return new Answer(cmd, false, msg);
+        }
+
+        return new Answer(cmd);
+    }
+
+    protected Answer execute(final DeleteIpAliasCommand cmd) {
+        String routerIp = cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP);
+        List<IpAliasTO> revokedIpAliasTOs = cmd.getDeleteIpAliasTos();
+        List<IpAliasTO> activeIpAliasTOs = cmd.getCreateIpAliasTos();
+        if (s_logger.isInfoEnabled()) {
+            s_logger.info("Executing deleteipAlias command: " + _gson.toJson(cmd));
+        }
+        String args=routerIp+" ";
+        for (IpAliasTO ipAliasTO : revokedIpAliasTOs) {
+            args = args + ipAliasTO.getAlias_count()+":"+ipAliasTO.getRouterip()+":"+ipAliasTO.getNetmask()+"-";
+        }
+        args = args + " " ;
+        for (IpAliasTO ipAliasTO : activeIpAliasTOs) {
+            args = args + ipAliasTO.getAlias_count()+":"+ipAliasTO.getRouterip()+":"+ipAliasTO.getNetmask()+"-";
+        }
+        if (s_logger.isDebugEnabled()) {
+            s_logger.debug("Run command on domR " + cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP) + ", /root/deleteipAlias " + args);
+        }
+
+        try {
+            VmwareManager mgr = getServiceContext().getStockObject(VmwareManager.CONTEXT_STOCK_NAME);
+            String controlIp = getRouterSshControlIp(cmd);
+            Pair<Boolean, String> result = SshHelper.sshExecute(controlIp, DEFAULT_DOMR_SSHPORT, "root", mgr.getSystemVMKeyFile(), null,
+                    "/root/deleteipAlias.sh " + args);
+
+            if (!result.first()) {
+                s_logger.error("ipAlias command on domr " + controlIp + " failed, message: " + result.second());
+
+                return new Answer(cmd, false, "deleteipAlias failed due to " + result.second());
+            }
+
+            if (s_logger.isInfoEnabled()) {
+                s_logger.info("deleteipAlias command on domain router " + controlIp + " completed");
+            }
+
+        } catch (Throwable e) {
+            String msg = "deleteipAlias failed due to " + VmwareHelper.getExceptionMessage(e);
+            s_logger.error(msg, e);
+            return new Answer(cmd, false, msg);
+        }
+
+        return new Answer(cmd);
+    }
+
+    protected Answer execute(final DnsMasqConfigCommand cmd) {
+        if (s_logger.isInfoEnabled()) {
+            s_logger.info("Executing deleteipAlias command: " + _gson.toJson(cmd));
+        }
+        String routerIp = cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP);
+        String controlIp = getRouterSshControlIp(cmd);
+
+        assert(controlIp != null);
+
+        DnsMasqConfigurator configurator = new DnsMasqConfigurator();
+        String [] config = configurator.generateConfiguration(cmd);
+        String tmpConfigFilePath = "/tmp/"+ routerIp.replace(".","-")+".cfg";
+        String tmpConfigFileContents = "";
+        for (int i = 0; i < config.length; i++) {
+            tmpConfigFileContents += config[i];
+            tmpConfigFileContents += "\n";
+        }
+        if (s_logger.isDebugEnabled()) {
+            s_logger.debug("Run command on domR " + cmd.getAccessDetail(NetworkElementCommand.ROUTER_IP) + ", /root/dnsmasq.sh " +"config file at" + tmpConfigFilePath);
+        }
+        VmwareManager mgr = getServiceContext().getStockObject(VmwareManager.CONTEXT_STOCK_NAME);
+        File keyFile = mgr.getSystemVMKeyFile();
+
+        try {
+            SshHelper.scpTo(controlIp, DEFAULT_DOMR_SSHPORT, "root", keyFile, null, "/tmp/", tmpConfigFileContents.getBytes(), routerIp.replace('.', '_') + ".cfg", null);
+
+            try {
+
+                Pair<Boolean, String> result = SshHelper.sshExecute(controlIp, DEFAULT_DOMR_SSHPORT, "root", mgr.getSystemVMKeyFile(), null, "scp" + tmpConfigFilePath + "/root/dnsmasq.sh");
+                if (s_logger.isDebugEnabled()) {
+                    s_logger.debug("Run command on domain router " + routerIp + ",  /root/dnsmasq.sh");
+                }
+
+                if (!result.first()) {
+                    s_logger.error("Unable to copy dnsmasq configuration file");
+                    return new Answer(cmd, false, "dnsmasq config failed due to uanble to copy dnsmasq configuration file");
+                }
+
+                if (s_logger.isInfoEnabled()) {
+                    s_logger.info("dnsmasq config command on domain router " + routerIp + " completed");
+                }
+            } finally {
+                SshHelper.sshExecute(controlIp, DEFAULT_DOMR_SSHPORT, "root", mgr.getSystemVMKeyFile(), null, "rm " + tmpConfigFilePath);
+            }
+
+            return new Answer(cmd);
+        } catch (Throwable e) {
+            s_logger.error("Unexpected exception: " + e.toString(), e);
+            return new Answer(cmd, false, "LoadBalancerConfigCommand failed due to " + VmwareHelper.getExceptionMessage(e));
+        }
     }
 
     protected CheckS2SVpnConnectionsAnswer execute(CheckS2SVpnConnectionsCommand cmd) {

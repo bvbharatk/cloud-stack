@@ -16,21 +16,6 @@
 // under the License.
 package com.cloud.network.element;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import javax.ejb.Local;
-import javax.inject.Inject;
-
-import com.cloud.utils.PropertiesUtil;
-import org.apache.cloudstack.api.command.admin.router.ConfigureVirtualRouterElementCmd;
-import org.apache.cloudstack.api.command.admin.router.CreateVirtualRouterElementCmd;
-import org.apache.cloudstack.api.command.admin.router.ListVirtualRouterElementsCmd;
-import org.apache.log4j.Logger;
-
 import com.cloud.agent.api.to.LoadBalancerTO;
 import com.cloud.configuration.ConfigurationManager;
 import com.cloud.configuration.dao.ConfigurationDao;
@@ -43,32 +28,20 @@ import com.cloud.exception.InvalidParameterValueException;
 import com.cloud.exception.ResourceUnavailableException;
 import com.cloud.host.dao.HostDao;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
-import com.cloud.network.Network;
+import com.cloud.network.*;
 import com.cloud.network.Network.Capability;
 import com.cloud.network.Network.Provider;
 import com.cloud.network.Network.Service;
-import com.cloud.network.NetworkModel;
 import com.cloud.network.Networks.TrafficType;
-import com.cloud.network.PhysicalNetworkServiceProvider;
-import com.cloud.network.PublicIpAddress;
-import com.cloud.network.RemoteAccessVpn;
-import com.cloud.network.VirtualRouterProvider;
 import com.cloud.network.VirtualRouterProvider.VirtualRouterProviderType;
-import com.cloud.network.VpnUser;
-import com.cloud.network.dao.LoadBalancerDao;
-import com.cloud.network.dao.NetworkDao;
-import com.cloud.network.dao.VirtualRouterProviderDao;
+import com.cloud.network.dao.*;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.network.lb.LoadBalancingRule.LbStickinessPolicy;
 import com.cloud.network.lb.LoadBalancingRulesManager;
 import com.cloud.network.router.VirtualRouter.Role;
 import com.cloud.network.router.VpcVirtualNetworkApplianceManager;
-import com.cloud.network.rules.FirewallRule;
-import com.cloud.network.rules.LbStickinessMethod;
+import com.cloud.network.rules.*;
 import com.cloud.network.rules.LbStickinessMethod.StickinessMethodType;
-import com.cloud.network.rules.PortForwardingRule;
-import com.cloud.network.rules.RulesManager;
-import com.cloud.network.rules.StaticNat;
 import com.cloud.offering.NetworkOffering;
 import com.cloud.offerings.NetworkOfferingVO;
 import com.cloud.offerings.dao.NetworkOfferingDao;
@@ -80,15 +53,19 @@ import com.cloud.utils.db.SearchCriteria.Op;
 import com.cloud.utils.db.SearchCriteria2;
 import com.cloud.utils.db.SearchCriteriaService;
 import com.cloud.utils.exception.CloudRuntimeException;
-import com.cloud.vm.DomainRouterVO;
-import com.cloud.vm.NicProfile;
-import com.cloud.vm.ReservationContext;
-import com.cloud.vm.VirtualMachine;
+import com.cloud.vm.*;
 import com.cloud.vm.VirtualMachine.State;
-import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.UserVmDao;
 import com.google.gson.Gson;
+import org.apache.cloudstack.api.command.admin.router.ConfigureVirtualRouterElementCmd;
+import org.apache.cloudstack.api.command.admin.router.CreateVirtualRouterElementCmd;
+import org.apache.cloudstack.api.command.admin.router.ListVirtualRouterElementsCmd;
+import org.apache.log4j.Logger;
+
+import javax.ejb.Local;
+import javax.inject.Inject;
+import java.util.*;
 
 @Local(value = {NetworkElement.class, FirewallServiceProvider.class, 
 		        DhcpServiceProvider.class, UserDataServiceProvider.class, 
@@ -130,6 +107,8 @@ public class VirtualRouterElement extends AdapterBase implements VirtualRouterEl
     ConfigurationDao _configDao;
     @Inject
     VirtualRouterProviderDao _vrProviderDao;
+    @Inject
+    IPAddressDao _ipAddressDao;
 
     protected boolean canHandle(Network network, Service service) {
         Long physicalNetworkId = _networkMgr.getPhysicalNetworkId(network);
@@ -809,6 +788,50 @@ public class VirtualRouterElement extends AdapterBase implements VirtualRouterEl
             ReservationContext context) throws ConcurrentOperationException,
             ResourceUnavailableException {
         return true;
+    }
+
+    @Override
+    public  boolean ConfigDhcp(Network network, NicProfile nic, VirtualMachineProfile<? extends VirtualMachine> vm,
+                               DeployDestination dest, ReservationContext context) throws ConcurrentOperationException, InsufficientCapacityException, ResourceUnavailableException {
+        if (canHandle(network, Service.Dhcp)) {
+            if (vm.getType() != VirtualMachine.Type.User) {
+                return false;
+            }
+            @SuppressWarnings("unchecked")
+            VirtualMachineProfile<UserVm> uservm = (VirtualMachineProfile<UserVm>) vm;
+
+            List<DomainRouterVO> routers = getRouters(network, dest);
+
+            if ((routers == null) || (routers.size() == 0)) {
+                throw new ResourceUnavailableException("Can't find at least one router!", DataCenter.class, network.getDataCenterId());
+            }
+
+            return _routerMgr.configDhcp(network, nic, uservm, dest, routers);
+        }
+        return false;
+    }
+
+    @Override
+    public boolean removeDhcpSupportForSubnet(Network network) {
+        if (canHandle(network, Service.Dhcp)) {
+            List<DomainRouterVO> routers = _routerDao.listByNetworkAndRole(network.getId(), Role.VIRTUAL_ROUTER);
+           try {
+               if ((routers == null) || (routers.size() == 0)) {
+                   throw new ResourceUnavailableException("Can't find at least one router!", DataCenter.class, network.getDataCenterId());
+               }
+           }
+           catch (ResourceUnavailableException e) {
+               s_logger.debug("could not find any router on this network");
+           }
+           try {
+                return _routerMgr.removeDhcpSupportForSubnet(network, routers);
+           }
+           catch (ResourceUnavailableException e) {
+                s_logger.debug("Router resource unavailable ");
+           }
+
+        }
+        return false;
     }
 
     @Override

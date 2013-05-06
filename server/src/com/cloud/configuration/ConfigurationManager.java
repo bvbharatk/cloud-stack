@@ -31,6 +31,7 @@ import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.InsufficientCapacityException;
 import com.cloud.exception.InvalidParameterValueException;
 import com.cloud.exception.ResourceAllocationException;
+import com.cloud.exception.*;
 import com.cloud.network.Network;
 import com.cloud.network.Network.Capability;
 import com.cloud.network.Network.Provider;
@@ -149,8 +150,6 @@ public interface ConfigurationManager extends ConfigurationService, Manager {
      * @return success/failure
      */
     boolean deleteVlanAndPublicIpRange(long userId, long vlanDbId, Account caller);
-
-    boolean releasePublicIpRange(long userId, long vlanDbId, Account caller);
 
     /**
      * Converts a comma separated list of tags to a List

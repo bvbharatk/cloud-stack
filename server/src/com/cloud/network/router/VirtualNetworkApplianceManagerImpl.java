@@ -17,74 +17,14 @@
 
 package com.cloud.network.router;
 
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import javax.ejb.Local;
-import javax.inject.Inject;
-import javax.naming.ConfigurationException;
-
-import com.cloud.server.ConfigurationServer;
-import org.apache.cloudstack.api.command.admin.router.UpgradeRouterCmd;
-import org.apache.log4j.Logger;
-import org.springframework.stereotype.Component;
-
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.AgentManager.OnError;
 import com.cloud.agent.Listener;
-import com.cloud.agent.api.AgentControlAnswer;
-import com.cloud.agent.api.AgentControlCommand;
-import com.cloud.agent.api.Answer;
-import com.cloud.agent.api.BumpUpPriorityCommand;
-import com.cloud.agent.api.CheckRouterAnswer;
-import com.cloud.agent.api.CheckRouterCommand;
-import com.cloud.agent.api.CheckS2SVpnConnectionsAnswer;
-import com.cloud.agent.api.CheckS2SVpnConnectionsCommand;
-import com.cloud.agent.api.Command;
-import com.cloud.agent.api.GetDomRVersionAnswer;
-import com.cloud.agent.api.GetDomRVersionCmd;
-import com.cloud.agent.api.ModifySshKeysCommand;
-import com.cloud.agent.api.NetworkUsageAnswer;
-import com.cloud.agent.api.NetworkUsageCommand;
-import com.cloud.agent.api.StartupCommand;
-import com.cloud.agent.api.StopAnswer;
+import com.cloud.agent.api.*;
 import com.cloud.agent.api.check.CheckSshAnswer;
 import com.cloud.agent.api.check.CheckSshCommand;
-import com.cloud.agent.api.routing.DhcpEntryCommand;
-import com.cloud.agent.api.routing.IpAssocCommand;
-import com.cloud.agent.api.routing.LoadBalancerConfigCommand;
-import com.cloud.agent.api.routing.NetworkElementCommand;
-import com.cloud.agent.api.routing.RemoteAccessVpnCfgCommand;
-import com.cloud.agent.api.routing.SavePasswordCommand;
-import com.cloud.agent.api.routing.SetFirewallRulesCommand;
-import com.cloud.agent.api.routing.SetPortForwardingRulesCommand;
-import com.cloud.agent.api.routing.SetPortForwardingRulesVpcCommand;
-import com.cloud.agent.api.routing.SetStaticNatRulesCommand;
-import com.cloud.agent.api.routing.VmDataCommand;
-import com.cloud.agent.api.routing.VpnUsersCfgCommand;
-import com.cloud.agent.api.to.FirewallRuleTO;
-import com.cloud.agent.api.to.IpAddressTO;
-import com.cloud.agent.api.to.LoadBalancerTO;
-import com.cloud.agent.api.to.NicTO;
-import com.cloud.agent.api.to.PortForwardingRuleTO;
-import com.cloud.agent.api.to.StaticNatRuleTO;
-import com.cloud.agent.api.to.VirtualMachineTO;
+import com.cloud.agent.api.routing.*;
+import com.cloud.agent.api.to.*;
 import com.cloud.agent.manager.Commands;
 import com.cloud.alert.AlertManager;
 import com.cloud.cluster.ManagementServerHostVO;
@@ -94,12 +34,8 @@ import com.cloud.configuration.Config;
 import com.cloud.configuration.ConfigurationManager;
 import com.cloud.configuration.ZoneConfig;
 import com.cloud.configuration.dao.ConfigurationDao;
-import com.cloud.dc.ClusterVO;
-import com.cloud.dc.DataCenter;
+import com.cloud.dc.*;
 import com.cloud.dc.DataCenter.NetworkType;
-import com.cloud.dc.DataCenterVO;
-import com.cloud.dc.HostPodVO;
-import com.cloud.dc.Pod;
 import com.cloud.dc.dao.ClusterDao;
 import com.cloud.dc.dao.DataCenterDao;
 import com.cloud.dc.dao.HostPodDao;
@@ -110,60 +46,21 @@ import com.cloud.deploy.DeploymentPlan;
 import com.cloud.deploy.DeploymentPlanner.ExcludeList;
 import com.cloud.event.ActionEvent;
 import com.cloud.event.EventTypes;
-import com.cloud.exception.AgentUnavailableException;
-import com.cloud.exception.ConcurrentOperationException;
-import com.cloud.exception.ConnectionException;
-import com.cloud.exception.InsufficientAddressCapacityException;
-import com.cloud.exception.InsufficientCapacityException;
-import com.cloud.exception.InsufficientServerCapacityException;
-import com.cloud.exception.InsufficientVirtualNetworkCapcityException;
-import com.cloud.exception.InvalidParameterValueException;
-import com.cloud.exception.OperationTimedoutException;
-import com.cloud.exception.ResourceUnavailableException;
-import com.cloud.exception.StorageUnavailableException;
+import com.cloud.exception.*;
 import com.cloud.host.HostVO;
 import com.cloud.host.Status;
 import com.cloud.host.dao.HostDao;
 import com.cloud.hypervisor.Hypervisor.HypervisorType;
-import com.cloud.network.IpAddress;
-import com.cloud.network.Network;
+import com.cloud.network.*;
 import com.cloud.network.Network.GuestType;
 import com.cloud.network.Network.Provider;
 import com.cloud.network.Network.Service;
-import com.cloud.network.NetworkManager;
-import com.cloud.network.NetworkModel;
 import com.cloud.network.Networks.BroadcastDomainType;
 import com.cloud.network.Networks.IsolationType;
 import com.cloud.network.Networks.TrafficType;
-import com.cloud.network.PhysicalNetworkServiceProvider;
-import com.cloud.network.PublicIpAddress;
-import com.cloud.network.RemoteAccessVpn;
-import com.cloud.network.Site2SiteCustomerGateway;
-import com.cloud.network.Site2SiteVpnConnection;
-import com.cloud.network.SshKeysDistriMonitor;
-import com.cloud.network.VirtualNetworkApplianceService;
-import com.cloud.network.VirtualRouterProvider;
 import com.cloud.network.VirtualRouterProvider.VirtualRouterProviderType;
-import com.cloud.network.VpnUser;
-import com.cloud.network.VpnUserVO;
 import com.cloud.network.addr.PublicIp;
-import com.cloud.network.dao.FirewallRulesDao;
-import com.cloud.network.dao.IPAddressDao;
-import com.cloud.network.dao.IPAddressVO;
-import com.cloud.network.dao.LoadBalancerDao;
-import com.cloud.network.dao.LoadBalancerVMMapDao;
-import com.cloud.network.dao.LoadBalancerVO;
-import com.cloud.network.dao.NetworkDao;
-import com.cloud.network.dao.NetworkVO;
-import com.cloud.network.dao.PhysicalNetworkServiceProviderDao;
-import com.cloud.network.dao.RemoteAccessVpnDao;
-import com.cloud.network.dao.Site2SiteCustomerGatewayDao;
-import com.cloud.network.dao.Site2SiteVpnConnectionDao;
-import com.cloud.network.dao.Site2SiteVpnConnectionVO;
-import com.cloud.network.dao.Site2SiteVpnGatewayDao;
-import com.cloud.network.dao.UserIpv6AddressDao;
-import com.cloud.network.dao.VirtualRouterProviderDao;
-import com.cloud.network.dao.VpnUserDao;
+import com.cloud.network.dao.*;
 import com.cloud.network.lb.LoadBalancingRule;
 import com.cloud.network.lb.LoadBalancingRule.LbDestination;
 import com.cloud.network.lb.LoadBalancingRule.LbHealthCheckPolicy;
@@ -171,19 +68,15 @@ import com.cloud.network.lb.LoadBalancingRule.LbStickinessPolicy;
 import com.cloud.network.lb.LoadBalancingRulesManager;
 import com.cloud.network.router.VirtualRouter.RedundantState;
 import com.cloud.network.router.VirtualRouter.Role;
-import com.cloud.network.rules.FirewallRule;
+import com.cloud.network.rules.*;
 import com.cloud.network.rules.FirewallRule.Purpose;
-import com.cloud.network.rules.PortForwardingRule;
-import com.cloud.network.rules.RulesManager;
-import com.cloud.network.rules.StaticNat;
-import com.cloud.network.rules.StaticNatImpl;
-import com.cloud.network.rules.StaticNatRule;
 import com.cloud.network.rules.dao.PortForwardingRulesDao;
 import com.cloud.network.vpn.Site2SiteVpnManager;
 import com.cloud.offering.NetworkOffering;
 import com.cloud.offering.ServiceOffering;
 import com.cloud.offerings.dao.NetworkOfferingDao;
 import com.cloud.resource.ResourceManager;
+import com.cloud.server.ConfigurationServer;
 import com.cloud.service.ServiceOfferingVO;
 import com.cloud.service.dao.ServiceOfferingDao;
 import com.cloud.storage.GuestOSVO;
@@ -193,13 +86,7 @@ import com.cloud.storage.VolumeVO;
 import com.cloud.storage.dao.GuestOSDao;
 import com.cloud.storage.dao.VMTemplateDao;
 import com.cloud.storage.dao.VolumeDao;
-import com.cloud.user.Account;
-import com.cloud.user.AccountManager;
-import com.cloud.user.User;
-import com.cloud.user.UserContext;
-import com.cloud.user.UserStatisticsVO;
-import com.cloud.user.UserStatsLogVO;
-import com.cloud.user.UserVO;
+import com.cloud.user.*;
 import com.cloud.user.dao.UserDao;
 import com.cloud.user.dao.UserStatisticsDao;
 import com.cloud.user.dao.UserStatsLogDao;
@@ -210,36 +97,23 @@ import com.cloud.utils.PasswordGenerator;
 import com.cloud.utils.StringUtils;
 import com.cloud.utils.component.ManagerBase;
 import com.cloud.utils.concurrency.NamedThreadFactory;
-import com.cloud.utils.db.DB;
-import com.cloud.utils.db.Filter;
-import com.cloud.utils.db.GlobalLock;
-import com.cloud.utils.db.JoinBuilder;
-import com.cloud.utils.db.SearchBuilder;
-import com.cloud.utils.db.SearchCriteria;
-import com.cloud.utils.db.Transaction;
+import com.cloud.utils.db.*;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.MacAddress;
 import com.cloud.utils.net.NetUtils;
-import com.cloud.vm.DomainRouterVO;
-import com.cloud.vm.Nic;
-import com.cloud.vm.NicProfile;
-import com.cloud.vm.NicVO;
-import com.cloud.vm.ReservationContext;
-import com.cloud.vm.ReservationContextImpl;
-import com.cloud.vm.UserVmVO;
-import com.cloud.vm.VMInstanceVO;
-import com.cloud.vm.VirtualMachine;
+import com.cloud.vm.*;
 import com.cloud.vm.VirtualMachine.State;
-import com.cloud.vm.VirtualMachineGuru;
-import com.cloud.vm.VirtualMachineManager;
-import com.cloud.vm.VirtualMachineName;
-import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.VirtualMachineProfile.Param;
-import com.cloud.vm.dao.DomainRouterDao;
-import com.cloud.vm.dao.NicDao;
-import com.cloud.vm.dao.UserVmDao;
-import com.cloud.vm.dao.UserVmDetailsDao;
-import com.cloud.vm.dao.VMInstanceDao;
+import com.cloud.vm.dao.*;
+import org.apache.cloudstack.api.command.admin.router.UpgradeRouterCmd;
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Component;
+
+import javax.ejb.Local;
+import javax.inject.Inject;
+import javax.naming.ConfigurationException;
+import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * VirtualNetworkApplianceManagerImpl manages the different types of virtual network appliances available in the Cloud Stack.
@@ -317,6 +191,8 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
     RemoteAccessVpnDao _vpnDao;
     @Inject
     NicDao _nicDao;
+    @Inject
+    NicIpAliasDao _nicIpAliasDao;
     @Inject
     VolumeDao _volumeDao = null;
     @Inject
@@ -2428,6 +2304,23 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
                     createApplyLoadBalancingRulesCommands(lbRules, router, cmds, guestNetworkId);
             }
         }
+        //Reapply dhcp and dns configuration.
+        if (_networkModel.isProviderSupportServiceInNetwork(guestNetworkId, Service.Dhcp, provider)) {
+            List<NicIpAliasVO> revokedIpAliasVOs = _nicIpAliasDao.listByNetworkIdAndState(guestNetworkId, NicIpAlias.state.revoked);
+            s_logger.debug("Found" + revokedIpAliasVOs.size() + "ip Aliases to apply on the router as a part of dhco configuration");
+            List<IpAliasTO> revokedIpAliasTOs = new ArrayList<IpAliasTO>();
+            for (NicIpAliasVO revokedAliasVO : revokedIpAliasVOs) {
+                revokedIpAliasTOs.add(new IpAliasTO(revokedAliasVO.getIp4Address(), revokedAliasVO.getNetmask(), revokedAliasVO.getAliasCount().toString()));
+            }
+            List<NicIpAliasVO> aliasVOs = _nicIpAliasDao.listByNetworkIdAndState(guestNetworkId, NicIpAlias.state.active);
+            s_logger.debug("Found" + aliasVOs.size() + "ip Aliases to apply on the router as a part of dhco configuration");
+            List<IpAliasTO> activeIpAliasTOs = new ArrayList<IpAliasTO>();
+            for (NicIpAliasVO aliasVO : aliasVOs) {
+                   activeIpAliasTOs.add(new IpAliasTO(aliasVO.getIp4Address(), aliasVO.getNetmask(), aliasVO.getAliasCount().toString()));
+            }
+            createDeleteIpAliasCommand(router, revokedIpAliasTOs, activeIpAliasTOs, guestNetworkId, cmds);
+
+        }
     }
 
     protected void finalizeIpAssocForNetwork(Commands cmds, VirtualRouter router, Provider provider, 
@@ -2669,7 +2562,129 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
             throw new CloudRuntimeException("Unable to stop " + router, e);
         }
     }
-    
+
+    @Override
+    public boolean configDhcp(Network network, final NicProfile nic, VirtualMachineProfile<UserVm> profile, DeployDestination dest, List<DomainRouterVO> routers) throws ResourceUnavailableException {
+        _userVmDao.loadDetails((UserVmVO) profile.getVirtualMachine());
+
+        final VirtualMachineProfile<UserVm> updatedProfile = profile;
+        final boolean isZoneBasic = (dest.getDataCenter().getNetworkType() == NetworkType.Basic);
+        final Long podId = isZoneBasic ? dest.getPod().getId() : null;
+
+        //Asuming we have only one router per network For Now.
+        DomainRouterVO router = routers.get(0);
+        if (router.getState() != State.Running) {
+            s_logger.warn("Failed to add/remove VPN users: router not in running state");
+            throw new ResourceUnavailableException("Unable to assign ip addresses, domR is not in right state " +
+                    router.getState(), DataCenter.class, network.getDataCenterId());
+        }
+        //check if this is not the primary subnet.
+
+
+        //check if the the ip Alias is configured on the virtualrouter.
+        UserVm vm = updatedProfile.getVirtualMachine();
+        NicVO domr_guest_nic = _nicDao.findByInstanceIdAndIpAddressAndVmtype(router.getId(), _nicDao.getIpAddress(nic.getNetworkId(), router.getId()), VirtualMachine.Type.DomainRouter);
+        //check if the router ip address and the vm ip address belong to same subnet.
+        //if they do not belong to same netwoek check for the alias ips. if not create one.
+        // This should happen only in case of Basic and Advanced SG enabled networks.
+        if (!NetUtils.sameSubnet(domr_guest_nic.getIp4Address(), nic.getIp4Address(), nic.getNetmask())){
+            List<NicIpAliasVO> aliasIps = _nicIpAliasDao.listByNetworkIdAndState(domr_guest_nic.getNetworkId(), NicIpAlias.state.active);
+            boolean ipInVmsubnet =false;
+            for (NicIpAliasVO alias : aliasIps) {
+                //check if any of the alias ips belongs to the Vm's subnet.
+                if (NetUtils.sameSubnet(alias.getIp4Address(),nic.getIp4Address(),nic.getNetmask())){
+                    ipInVmsubnet = true;
+                    break;
+                }
+            }
+            PublicIp routerPublicIP = null;
+            String routerAliasIp =null;
+            DataCenter dc = _dcDao.findById(router.getDataCenterId());
+            if (ipInVmsubnet == false) {
+                try {
+                    if (network.getTrafficType() == TrafficType.Guest && network.getGuestType() == GuestType.Shared) {
+                        Pod pod = _podDao.findById(vm.getPodIdToDeployIn());
+                        Account caller = UserContext.current().getCaller();
+                        List<VlanVO> vlanList = _vlanDao.listVlansByNetworkIdAndGateway(network.getId(), nic.getGateway());
+                        List<Long>   vlanDbIdList = new ArrayList<Long>();
+                        for (VlanVO vlan : vlanList) {
+                            vlanDbIdList.add(vlan.getId());
+                        }
+                        routerPublicIP = _networkMgr.assignPublicIpAddressFromVlans(router.getDataCenterId(), vm.getPodIdToDeployIn(), caller, Vlan.VlanType.DirectAttached, vlanDbIdList, nic.getNetworkId(), null, false);
+                        routerAliasIp = routerPublicIP.getAddress().addr();
+                    }
+                }
+                catch (InsufficientAddressCapacityException e){
+                    s_logger.info(e.getMessage());
+                    s_logger.info("unable to configure dhcp for this VM.");
+                    return false;
+                }
+                //this means we did not create a ip alis on the router.
+                NicIpAliasVO alias = new NicIpAliasVO(domr_guest_nic.getId(), routerAliasIp, router.getId(), UserContext.current().getAccountId(), network.getDomainId(), nic.getNetworkId(),nic.getGateway(), nic.getNetmask());
+                alias.setAliasCount((routerPublicIP.getIpMacAddress()));
+                _nicIpAliasDao.persist(alias);
+                List<IpAliasTO> ipaliasTo = new ArrayList<IpAliasTO>();
+                ipaliasTo.add(new IpAliasTO(routerAliasIp, alias.getNetmask(), alias.getAliasCount().toString()));
+                Commands cmds = new Commands(OnError.Stop);
+                createIpAlias(router, ipaliasTo, alias.getNetworkId(), cmds);
+                //also add the required configuration to the dnsmasq for supporting dhcp and dns on the new ip.
+                configDnsMasq(router, network, cmds);
+                boolean result = sendCommandsToRouter(router, cmds);
+                if (result == false) {
+                    NicIpAliasVO ipAliasVO = _nicIpAliasDao.findByInstanceIdAndNetworkId(network.getId(), router.getId());
+                    _nicIpAliasDao.expunge(ipAliasVO.getId());
+                    _ipAddressDao.unassignIpAddress(routerPublicIP.getId());
+                    throw new CloudRuntimeException("failed to configure ip alias on the router as a part of dhcp config");
+                }
+            }
+            return true;
+        }
+        return true;
+    }
+
+    @Override
+    public boolean removeDhcpSupportForSubnet(Network network,  List<DomainRouterVO> routers) throws ResourceUnavailableException {
+        if (routers == null || routers.isEmpty()) {
+            s_logger.warn("Failed to add/remove VPN users: no router found for account and zone");
+            throw new ResourceUnavailableException("Unable to assign ip addresses, domR doesn't exist for network " +
+                    network.getId(), DataCenter.class, network.getDataCenterId());
+        }
+
+        boolean agentResults = true;
+
+        for (DomainRouterVO router : routers) {
+            if (router.getState() != State.Running) {
+                s_logger.warn("Failed to add/remove VPN users: router not in running state");
+                throw new ResourceUnavailableException("Unable to assign ip addresses, domR is not in right state " +
+                        router.getState(), DataCenter.class, network.getDataCenterId());
+            }
+
+            Commands cmds = new Commands(OnError.Continue);
+            List<NicIpAliasVO> revokedIpAliasVOs = _nicIpAliasDao.listByNetworkIdAndState(network.getId(), NicIpAlias.state.revoked);
+            s_logger.debug("Found" + revokedIpAliasVOs.size() + "ip Aliases to apply on the router as a part of dhco configuration");
+            List<IpAliasTO> revokedIpAliasTOs = new ArrayList<IpAliasTO>();
+            for (NicIpAliasVO revokedAliasVO : revokedIpAliasVOs) {
+                revokedIpAliasTOs.add(new IpAliasTO(revokedAliasVO.getIp4Address(), revokedAliasVO.getNetmask(), revokedAliasVO.getAliasCount().toString()));
+            }
+            List<NicIpAliasVO> aliasVOs = _nicIpAliasDao.listByNetworkIdAndState(network.getId(), NicIpAlias.state.active);
+            s_logger.debug("Found" + aliasVOs.size() + "ip Aliases to apply on the router as a part of dhco configuration");
+            List<IpAliasTO> activeIpAliasTOs = new ArrayList<IpAliasTO>();
+            for (NicIpAliasVO aliasVO : aliasVOs) {
+                activeIpAliasTOs.add(new IpAliasTO(aliasVO.getIp4Address(), aliasVO.getNetmask(), aliasVO.getAliasCount().toString()));
+            }
+            createDeleteIpAliasCommand(router, revokedIpAliasTOs, activeIpAliasTOs, network.getId(), cmds);
+            configDnsMasq(router, network, cmds);
+            boolean result = sendCommandsToRouter(router, cmds);
+            if (result) {
+                for (NicIpAliasVO revokedAliasVO : revokedIpAliasVOs) {
+                    _nicIpAliasDao.expunge(revokedAliasVO.getId());
+                }
+            }
+        }
+        return  false;
+    }
+
+
     @Override
     public boolean applyDhcpEntry(Network network, final NicProfile nic, VirtualMachineProfile<UserVm> profile, 
             DeployDestination dest, List<DomainRouterVO> routers)
@@ -2702,7 +2717,19 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
         });
     }
 
-    private String findDefaultDnsIp(long userVmId) {
+    private void createDeleteIpAliasCommand(DomainRouterVO router, List<IpAliasTO> deleteIpAliasTOs, List<IpAliasTO> createIpAliasTos, long networkId, Commands cmds) {
+        String routerip = getRouterIpInNetwork(networkId, router.getId());
+        DataCenterVO dcVo = _dcDao.findById(router.getDataCenterId());
+        DeleteIpAliasCommand deleteIpaliasCmd = new DeleteIpAliasCommand(routerip, deleteIpAliasTOs, createIpAliasTos);
+        deleteIpaliasCmd.setAccessDetail(NetworkElementCommand.ROUTER_IP, getRouterControlIp(router.getId()));
+        deleteIpaliasCmd.setAccessDetail(NetworkElementCommand.ROUTER_NAME, router.getInstanceName());
+        deleteIpaliasCmd.setAccessDetail(NetworkElementCommand.ROUTER_GUEST_IP,routerip);
+        deleteIpaliasCmd.setAccessDetail(NetworkElementCommand.ZONE_NETWORK_TYPE, dcVo.getNetworkType().toString());
+
+        cmds.addCommand("deleteIpalias", deleteIpaliasCmd);
+    }
+
+    private NicVO findDefaultDnsIp(long userVmId) {
         NicVO defaultNic = _nicDao.findDefaultNicForVM(userVmId);
         
         //check if DNS provider is the domR
@@ -2725,12 +2752,12 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
         } else{
             domrDefaultNic = _nicDao.findByNetworkIdAndType(defaultNic.getNetworkId(), VirtualMachine.Type.DomainRouter);
         }
-        return domrDefaultNic.getIp4Address();
+        return domrDefaultNic;
     }
 
-    private String findGatewayIp(long userVmId) {
+    private NicVO findGatewayIp(long userVmId) {
         NicVO defaultNic = _nicDao.findDefaultNicForVM(userVmId);
-        return defaultNic.getGateway();
+        return defaultNic;
      }
 
     @Override
@@ -3156,7 +3183,8 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
     private void createDhcpEntryCommand(VirtualRouter router, UserVm vm, NicVO nic, Commands cmds) {
         DhcpEntryCommand dhcpCommand = new DhcpEntryCommand(nic.getMacAddress(), nic.getIp4Address(), vm.getHostName(), nic.getIp6Address());
         DataCenterVO dcVo = _dcDao.findById(router.getDataCenterId());
-        String gatewayIp = findGatewayIp(vm.getId());
+        Nic defaultNic = findGatewayIp(vm.getId());
+        String gatewayIp = defaultNic.getGateway();
         boolean needGateway = true;
         if (gatewayIp != null && !gatewayIp.equals(nic.getGateway())) {
             needGateway = false;
@@ -3175,7 +3203,12 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
         }
         dhcpCommand.setDefaultRouter(gatewayIp);
         dhcpCommand.setIp6Gateway(nic.getIp6Gateway());
-        dhcpCommand.setDefaultDns(findDefaultDnsIp(vm.getId()));
+        String ipaddress=null;
+        NicVO domrDefaultNic =  findDefaultDnsIp(vm.getId());
+        if (domrDefaultNic != null){
+            ipaddress  = domrDefaultNic.getIp4Address();
+        }
+        dhcpCommand.setDefaultDns(ipaddress);
         dhcpCommand.setDuid(NetUtils.getDuidLL(nic.getMacAddress()));
         dhcpCommand.setDefault(nic.isDefaultNic());
 
@@ -3185,6 +3218,42 @@ public class VirtualNetworkApplianceManagerImpl extends ManagerBase implements V
         dhcpCommand.setAccessDetail(NetworkElementCommand.ZONE_NETWORK_TYPE, dcVo.getNetworkType().toString());
 
         cmds.addCommand("dhcp", dhcpCommand);
+    }
+
+    private void configDnsMasq(VirtualRouter router, Network network, Commands cmds) {
+        DataCenterVO dcVo = _dcDao.findById(router.getDataCenterId());
+        List<NicIpAliasVO> ipAliasVOList = _nicIpAliasDao.getAliasIpForVm(router.getId());
+        List<DnsmasqTO> ipList = new ArrayList<DnsmasqTO>();
+
+        NicVO router_guest_ip = _nicDao.findByInstanceIdAndNetworkId(network.getId(), router.getId());
+        ipList.add(new DnsmasqTO(router_guest_ip.getIp4Address(),router_guest_ip.getGateway(),router_guest_ip.getNetmask()));
+        for (NicIpAliasVO ipAliasVO : ipAliasVOList) {
+             DnsmasqTO dnsmasqTO = new DnsmasqTO(ipAliasVO.getStartIpOfSubnet(), ipAliasVO.getGateway(), ipAliasVO.getNetmask());
+             ipList.add(dnsmasqTO);
+        }
+        DataCenterVO dcvo = _dcDao.findById(router.getDataCenterId());
+        DnsMasqConfigCommand dnsMasqConfigCmd = new DnsMasqConfigCommand(network.getNetworkDomain(),ipList, dcvo.getDns1(), dcvo.getDns2(), dcvo.getInternalDns1(), dcvo.getInternalDns2());
+        dnsMasqConfigCmd.setAccessDetail(NetworkElementCommand.ROUTER_IP, getRouterControlIp(router.getId()));
+        dnsMasqConfigCmd.setAccessDetail(NetworkElementCommand.ROUTER_NAME, router.getInstanceName());
+        dnsMasqConfigCmd.setAccessDetail(NetworkElementCommand.ROUTER_GUEST_IP, getRouterIpInNetwork(network.getId(), router.getId()));
+        dnsMasqConfigCmd.setAccessDetail(NetworkElementCommand.ZONE_NETWORK_TYPE, dcVo.getNetworkType().toString());
+
+        cmds.addCommand("dhcpConfig" ,dnsMasqConfigCmd);
+        //To change body of created methods use File | Settings | File Templates.
+    }
+
+
+    private void createIpAlias(VirtualRouter router, List<IpAliasTO> ipAliasTOs, Long networkid, Commands cmds) {
+
+        String routerip = getRouterIpInNetwork(networkid, router.getId());
+        DataCenterVO dcVo = _dcDao.findById(router.getDataCenterId());
+        IpAliasCommand ipaliasCmd = new IpAliasCommand(routerip, ipAliasTOs);
+        ipaliasCmd.setAccessDetail(NetworkElementCommand.ROUTER_IP, getRouterControlIp(router.getId()));
+        ipaliasCmd.setAccessDetail(NetworkElementCommand.ROUTER_NAME, router.getInstanceName());
+        ipaliasCmd.setAccessDetail(NetworkElementCommand.ROUTER_GUEST_IP,routerip);
+        ipaliasCmd.setAccessDetail(NetworkElementCommand.ZONE_NETWORK_TYPE, dcVo.getNetworkType().toString());
+
+        cmds.addCommand("ipalias", ipaliasCmd);
     }
 
     private void createDhcpEntryCommandsForVMs(DomainRouterVO router, Commands cmds, long guestNetworkId) {

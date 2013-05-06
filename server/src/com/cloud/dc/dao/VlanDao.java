@@ -52,4 +52,6 @@ public interface VlanDao extends GenericDao<VlanVO, Long> {
 	List<VlanVO> listVlansByPhysicalNetworkId(long physicalNetworkId);
 
         List<VlanVO> listZoneWideNonDedicatedVlans(long zoneId);
+
+    List<VlanVO> listVlansByNetworkIdAndGateway(long networkid, String gateway);
 }
