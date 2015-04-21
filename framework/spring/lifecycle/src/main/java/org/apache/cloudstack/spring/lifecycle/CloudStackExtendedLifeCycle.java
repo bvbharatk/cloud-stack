@@ -96,12 +96,13 @@ public class CloudStackExtendedLifeCycle extends AbstractBeanCollector {
     }
 
     public void stopBeans() {
-        with(new WithComponentLifeCycle() {
-            @Override
-            public void with(ComponentLifecycle lifecycle) {
-                lifecycle.stop();
-            }
-        });
+            with(new WithComponentLifeCycle() {
+                @Override
+                public void with(ComponentLifecycle lifecycle) {
+                        log.info("stopping bean " + lifecycle.getName());
+                        lifecycle.stop();
+                    }
+            });
     }
 
     private void configure() {

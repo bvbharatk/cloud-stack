@@ -49,12 +49,14 @@ public class CloudStackContextLoaderListener extends ContextLoaderListener {
     @Override
     public void contextInitialized(ServletContextEvent event) {
         try {
-            cloudStackContext = new CloudStackSpringContext();
-            event.getServletContext().setAttribute(CloudStackSpringContext.CLOUDSTACK_CONTEXT_SERVLET_KEY, cloudStackContext);
-        } catch (IOException e) {
-            log.error("Failed to start CloudStack", e);
-            throw new RuntimeException("Failed to initialize CloudStack Spring modules", e);
-        }
+            try {
+                cloudStackContext = new CloudStackSpringContext();
+                cloudStackContext.registerShutdownHook();
+                event.getServletContext().setAttribute(CloudStackSpringContext.CLOUDSTACK_CONTEXT_SERVLET_KEY, cloudStackContext);
+            } catch (IOException e) {
+                log.error("Failed to start CloudStack", e);
+                throw new RuntimeException("Failed to initialize CloudStack Spring modules", e);
+            }
 
         configuredParentName = event.getServletContext().getInitParameter(WEB_PARENT_MODULE);
         if (configuredParentName == null) {
