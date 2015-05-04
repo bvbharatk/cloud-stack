@@ -16,57 +16,6 @@
 // under the License.
 package com.cloud.hypervisor.hyperv.resource;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
-import java.rmi.RemoteException;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.annotation.PostConstruct;
-import javax.ejb.Local;
-import javax.inject.Inject;
-import javax.naming.ConfigurationException;
-
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.conn.ClientConnectionManager;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.AllowAllHostnameVerifier;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.conn.ssl.TrustStrategy;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.BasicClientConnectionManager;
-import org.apache.http.util.EntityUtils;
-import org.apache.log4j.Logger;
-
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import org.apache.cloudstack.storage.command.CopyCommand;
-
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.CheckRouterAnswer;
 import com.cloud.agent.api.CheckRouterCommand;
@@ -156,6 +105,53 @@ import com.cloud.utils.ssh.SshHelper;
 import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachine.PowerState;
 import com.cloud.vm.VirtualMachineName;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import org.apache.cloudstack.storage.command.CopyCommand;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.AllowAllHostnameVerifier;
+import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.conn.ssl.TrustStrategy;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.BasicClientConnectionManager;
+import org.apache.http.util.EntityUtils;
+import org.apache.log4j.Logger;
+
+import javax.annotation.PostConstruct;
+import javax.ejb.Local;
+import javax.inject.Inject;
+import javax.naming.ConfigurationException;
+import java.io.File;
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.rmi.RemoteException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -165,6 +161,7 @@ import com.cloud.vm.VirtualMachineName;
 public class HypervDirectConnectResource extends ServerResourceBase implements ServerResource, VirtualRouterDeployer {
     public static final int DEFAULT_AGENT_PORT = 8250;
     public static final String HOST_VM_STATE_REPORT_COMMAND = "org.apache.cloudstack.HostVmStateReportCommand";
+    public static final String GET_CLUSTER_DETAILS_COMMAND = "org.apache.cloudstack.GetClusterDetailsCommand";
     private static final Logger s_logger = Logger.getLogger(HypervDirectConnectResource.class.getName());
 
     private static final Gson s_gson = GsonHelper.getGson();
@@ -282,10 +279,8 @@ public class HypervDirectConnectResource extends ServerResourceBase implements S
             return null;
         }
         if (!startCmd.getName().equals(defaultStartRoutCmd.getName())) {
-            String errMsg = String.format("Host %s (IP %s) name.  Was " + startCmd.getName() + " NOW its " + defaultStartRoutCmd.getName(), _name, _agentIp);
-            s_logger.error(errMsg);
-            // TODO: valid to return null, or should we throw?
-            return null;
+            String msg = String.format("Host %s (IP %s) name.  Was " + defaultStartRoutCmd.getName() + " NOW its " + startCmd.getName(), _name, _agentIp);
+            s_logger.warn(msg + "; Please ignore warning if you have not changed host name");
         }
 
         // Host will also supply details of an existing StoragePool if it has
@@ -1894,8 +1889,6 @@ public class HypervDirectConnectResource extends ServerResourceBase implements S
         Answer[] result = s_gson.fromJson(ansStr, Answer[].class);
         s_logger.debug("executeRequest received response "
                 + s_gson.toJson(result));
-        if (result.length > 0) {
-        }
     }
 
     protected void modifyNicVlan(String vmName, String vlanId, int pos, boolean enable, String switchLabelName) {
@@ -1915,8 +1908,6 @@ public class HypervDirectConnectResource extends ServerResourceBase implements S
         Answer[] result = s_gson.fromJson(ansStr, Answer[].class);
         s_logger.debug("executeRequest received response "
                 + s_gson.toJson(result));
-        if (result.length > 0) {
-        }
     }
 
     protected void assignPublicIpAddress(final String vmName, final String privateIpAddress, final String publicIpAddress, final boolean add, final boolean firstIP,
@@ -2204,6 +2195,34 @@ public class HypervDirectConnectResource extends ServerResourceBase implements S
             s_logger.error("Unable to locate id_rsa.cloud in your setup at " + keyFile.toString());
         }
         return keyFile;
+    }
+
+    public static Map<String, List<String>> GetClusterDetails(String hostIp) {
+        URI agentUri;
+        try {
+            agentUri = new URI("https", null, hostIp, DEFAULT_AGENT_PORT, "/api/HypervResource/" + GET_CLUSTER_DETAILS_COMMAND, null, null);
+        } catch (URISyntaxException e) {
+            String errMsg = "Could not generate URI for Hyper-V agent";
+            s_logger.error(errMsg, e);
+            return null;
+        }
+        String incomingCmd = postHttpRequest("{}", agentUri);
+
+        if (incomingCmd == null) {
+            return null;
+        }
+        Map<String, List<String>> result = null;
+        try {
+            result = s_gson.fromJson(incomingCmd, new TypeToken<Map<String, List<String>>>() {}.getType());
+        } catch (Exception ex) {
+            String errMsg = "Failed to deserialize Command[] " + incomingCmd;
+            s_logger.error(errMsg, ex);
+        }
+        s_logger.debug("GetClusterDetailsCommand received response " + s_gson.toJson(result));
+        if (result != null) {
+            return result;
+        }
+        return null;
     }
 
     public static String postHttpRequest(final String jsonCmd, final URI agentUri) {
