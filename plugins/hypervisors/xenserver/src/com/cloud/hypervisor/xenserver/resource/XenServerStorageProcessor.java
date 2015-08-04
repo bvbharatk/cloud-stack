@@ -18,42 +18,6 @@
  */
 package com.cloud.hypervisor.xenserver.resource;
 
-import static com.cloud.utils.ReflectUtil.flattenProperties;
-import static com.google.common.collect.Lists.newArrayList;
-
-import java.io.File;
-import java.net.URI;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
-import org.apache.cloudstack.storage.command.AttachAnswer;
-import org.apache.cloudstack.storage.command.AttachCommand;
-import org.apache.cloudstack.storage.command.AttachPrimaryDataStoreAnswer;
-import org.apache.cloudstack.storage.command.AttachPrimaryDataStoreCmd;
-import org.apache.cloudstack.storage.command.CopyCmdAnswer;
-import org.apache.cloudstack.storage.command.CopyCommand;
-import org.apache.cloudstack.storage.command.CreateObjectAnswer;
-import org.apache.cloudstack.storage.command.CreateObjectCommand;
-import org.apache.cloudstack.storage.command.DeleteCommand;
-import org.apache.cloudstack.storage.command.DettachAnswer;
-import org.apache.cloudstack.storage.command.DettachCommand;
-import org.apache.cloudstack.storage.command.ForgetObjectCmd;
-import org.apache.cloudstack.storage.command.IntroduceObjectAnswer;
-import org.apache.cloudstack.storage.command.IntroduceObjectCmd;
-import org.apache.cloudstack.storage.command.SnapshotAndCopyAnswer;
-import org.apache.cloudstack.storage.command.SnapshotAndCopyCommand;
-import org.apache.cloudstack.storage.datastore.protocol.DataStoreProtocol;
-import org.apache.cloudstack.storage.to.PrimaryDataStoreTO;
-import org.apache.cloudstack.storage.to.SnapshotObjectTO;
-import org.apache.cloudstack.storage.to.TemplateObjectTO;
-import org.apache.cloudstack.storage.to.VolumeObjectTO;
-import org.apache.log4j.Logger;
-import org.apache.xmlrpc.XmlRpcException;
-
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.to.DataObjectType;
 import com.cloud.agent.api.to.DataStoreTO;
@@ -86,6 +50,41 @@ import com.xensource.xenapi.Types.XenAPIException;
 import com.xensource.xenapi.VBD;
 import com.xensource.xenapi.VDI;
 import com.xensource.xenapi.VM;
+import org.apache.cloudstack.storage.command.AttachAnswer;
+import org.apache.cloudstack.storage.command.AttachCommand;
+import org.apache.cloudstack.storage.command.AttachPrimaryDataStoreAnswer;
+import org.apache.cloudstack.storage.command.AttachPrimaryDataStoreCmd;
+import org.apache.cloudstack.storage.command.CopyCmdAnswer;
+import org.apache.cloudstack.storage.command.CopyCommand;
+import org.apache.cloudstack.storage.command.CreateObjectAnswer;
+import org.apache.cloudstack.storage.command.CreateObjectCommand;
+import org.apache.cloudstack.storage.command.DeleteCommand;
+import org.apache.cloudstack.storage.command.DettachAnswer;
+import org.apache.cloudstack.storage.command.DettachCommand;
+import org.apache.cloudstack.storage.command.ForgetObjectCmd;
+import org.apache.cloudstack.storage.command.IntroduceObjectAnswer;
+import org.apache.cloudstack.storage.command.IntroduceObjectCmd;
+import org.apache.cloudstack.storage.command.SnapshotAndCopyAnswer;
+import org.apache.cloudstack.storage.command.SnapshotAndCopyCommand;
+import org.apache.cloudstack.storage.datastore.protocol.DataStoreProtocol;
+import org.apache.cloudstack.storage.to.PrimaryDataStoreTO;
+import org.apache.cloudstack.storage.to.SnapshotObjectTO;
+import org.apache.cloudstack.storage.to.TemplateObjectTO;
+import org.apache.cloudstack.storage.to.VolumeObjectTO;
+import org.apache.log4j.Logger;
+import org.apache.xmlrpc.XmlRpcException;
+
+import java.io.File;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import static com.cloud.utils.ReflectUtil.flattenProperties;
+import static com.google.common.collect.Lists.newArrayList;
 
 public class XenServerStorageProcessor implements StorageProcessor {
     private static final Logger s_logger = Logger.getLogger(XenServerStorageProcessor.class);

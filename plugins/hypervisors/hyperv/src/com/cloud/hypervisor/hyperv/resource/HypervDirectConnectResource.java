@@ -22,6 +22,8 @@ import com.cloud.agent.api.CheckRouterCommand;
 import com.cloud.agent.api.CheckS2SVpnConnectionsAnswer;
 import com.cloud.agent.api.CheckS2SVpnConnectionsCommand;
 import com.cloud.agent.api.Command;
+import com.cloud.agent.api.CopyFileInVmAnswer;
+import com.cloud.agent.api.CopyFileInVmCommand;
 import com.cloud.agent.api.GetDomRVersionAnswer;
 import com.cloud.agent.api.GetDomRVersionCmd;
 import com.cloud.agent.api.GetVmConfigAnswer;
@@ -109,6 +111,8 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.apache.cloudstack.storage.command.CopyCommand;
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
@@ -486,6 +490,8 @@ public class HypervDirectConnectResource extends ServerResourceBase implements S
             answer = execute((UnPlugNicCommand)cmd);
         } else if (clazz == CopyCommand.class) {
             answer = execute((CopyCommand)cmd);
+        } else if (clazz == CopyFileInVmCommand.class) {
+            answer = execute((CopyFileInVmCommand)cmd);
         }
         else {
             if (clazz == StartCommand.class) {
@@ -590,6 +596,25 @@ public class HypervDirectConnectResource extends ServerResourceBase implements S
         }
     }
 
+    private CopyFileInVmAnswer execute(CopyFileInVmCommand cmd) {
+        File keyFile = getSystemVMKeyFile();
+        try {
+            File file = new File(cmd.getSrc());
+            if(file.exists()) {
+                if(file.isDirectory()) {
+                    for (File f : FileUtils.listFiles(new File(cmd.getSrc()), TrueFileFilter.INSTANCE, TrueFileFilter.INSTANCE)) {
+                        SshHelper.scpTo(cmd.getVmIp(), 3922, "root", keyFile, null, cmd.getDest(), f.getCanonicalPath(), null);
+                    }
+                } else {
+                    SshHelper.scpTo(cmd.getVmIp(), 3922, "root", keyFile, null, cmd.getDest(), file.getCanonicalPath(), null);
+                }
+            }
+        } catch (Exception e) {
+            s_logger.error("Fail to copy file " + cmd.getSrc() + " in VM " + cmd.getVmIp(), e);
+            return new CopyFileInVmAnswer(cmd, e);
+        }
+        return new CopyFileInVmAnswer(cmd);
+    }
 
     private UnPlugNicAnswer execute(UnPlugNicCommand cmd) {
         if (s_logger.isInfoEnabled()) {

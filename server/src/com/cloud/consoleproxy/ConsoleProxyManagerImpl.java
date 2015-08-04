@@ -16,45 +16,13 @@
 // under the License.
 package com.cloud.consoleproxy;
 
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.ejb.Local;
-import javax.inject.Inject;
-import javax.naming.ConfigurationException;
-
-import org.apache.log4j.Logger;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import org.apache.cloudstack.config.ApiServiceConfiguration;
-import org.apache.cloudstack.context.CallContext;
-import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
-import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
-import org.apache.cloudstack.framework.security.keys.KeysManager;
-import org.apache.cloudstack.framework.security.keystore.KeystoreDao;
-import org.apache.cloudstack.framework.security.keystore.KeystoreManager;
-import org.apache.cloudstack.framework.security.keystore.KeystoreVO;
-import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
-import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
-import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreDao;
-import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreVO;
-
 import com.cloud.agent.AgentManager;
 import com.cloud.agent.api.Answer;
 import com.cloud.agent.api.ConsoleProxyLoadReportCommand;
+import com.cloud.agent.api.CopyFileInVmCommand;
 import com.cloud.agent.api.RebootCommand;
 import com.cloud.agent.api.StartupCommand;
 import com.cloud.agent.api.StartupProxyCommand;
-import com.cloud.agent.api.check.CheckSshAnswer;
 import com.cloud.agent.api.check.CheckSshCommand;
 import com.cloud.agent.api.proxy.ConsoleProxyLoadAnswer;
 import com.cloud.agent.manager.Commands;
@@ -141,6 +109,35 @@ import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.dao.ConsoleProxyDao;
 import com.cloud.vm.dao.UserVmDetailsDao;
 import com.cloud.vm.dao.VMInstanceDao;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.apache.cloudstack.config.ApiServiceConfiguration;
+import org.apache.cloudstack.context.CallContext;
+import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
+import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
+import org.apache.cloudstack.framework.security.keys.KeysManager;
+import org.apache.cloudstack.framework.security.keystore.KeystoreDao;
+import org.apache.cloudstack.framework.security.keystore.KeystoreManager;
+import org.apache.cloudstack.framework.security.keystore.KeystoreVO;
+import org.apache.cloudstack.storage.datastore.db.PrimaryDataStoreDao;
+import org.apache.cloudstack.storage.datastore.db.StoragePoolVO;
+import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreDao;
+import org.apache.cloudstack.storage.datastore.db.TemplateDataStoreVO;
+import org.apache.log4j.Logger;
+
+import javax.ejb.Local;
+import javax.inject.Inject;
+import javax.naming.ConfigurationException;
+import java.io.File;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 //
 // Possible console proxy state transition cases
@@ -1425,19 +1422,29 @@ public class ConsoleProxyManagerImpl extends ManagerBase implements ConsoleProxy
         CheckSshCommand check = new CheckSshCommand(profile.getInstanceName(), controlNic.getIp4Address(), 3922);
         cmds.addCommand("checkSsh", check);
 
+        File uiFiles = new File("systemvm/js");
+        if(uiFiles.exists() && uiFiles.isDirectory()) {
+            CopyFileInVmCommand copyFile = new CopyFileInVmCommand("systemvm/js", "/usr/local/cloud/systemvm/js", controlNic.getIp4Address());
+            cmds.addCommand("copyFile", copyFile);
+        } else {
+            s_logger.error("Couldn't locate localization files for console proxy");
+            return false;
+        }
+
         return true;
     }
 
     @Override
     public boolean finalizeStart(VirtualMachineProfile profile, long hostId, Commands cmds, ReservationContext context) {
-        CheckSshAnswer answer = (CheckSshAnswer)cmds.getAnswer("checkSsh");
-        if (answer == null || !answer.getResult()) {
-            if (answer != null) {
-                s_logger.warn("Unable to ssh to the VM: " + answer.getDetails());
-            } else {
-                s_logger.warn("Unable to ssh to the VM: null answer");
+        for(Answer answer : cmds.getAnswers()) {
+            if(answer == null || !answer.getResult()) {
+                if (answer != null) {
+                    s_logger.warn("Unable to ssh to the VM: " + answer.getDetails());
+                } else {
+                    s_logger.warn("Unable to ssh to the VM: null answer");
+                }
+                return false;
             }
-            return false;
         }
 
         try {
