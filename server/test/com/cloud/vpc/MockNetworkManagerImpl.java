@@ -844,6 +844,21 @@ public class MockNetworkManagerImpl extends ManagerBase implements NetworkOrches
     }
 
     @Override
+    public boolean canUpdateInSequence(Network network) {
+        return false;
+    }
+
+    @Override
+    public void configureUpdateInSequence(Network network) {
+        return;
+    }
+
+    @Override
+    public boolean isUpdateComplete(Network network) {
+        return false;
+    }
+
+    @Override
     public void prepareNicForMigration(VirtualMachineProfile vm, DeployDestination dest) {
         // TODO Auto-generated method stub
 

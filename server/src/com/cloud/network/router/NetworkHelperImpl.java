@@ -239,11 +239,6 @@ public class NetworkHelperImpl implements NetworkHelper {
         }
 
         final DomainRouterVO router = _routerDao.findById(routerId);
-        if (router == null) {
-            return null;
-        }
-
-        _accountMgr.checkAccess(caller, null, true, router);
 
         _itMgr.expunge(router.getUuid());
         _routerDao.remove(router.getId());
