@@ -413,3 +413,5 @@ CREATE TABLE `cloud`.`ldap_trust_map` (
   UNIQUE KEY `uk_ldap_trust_map__domain_id` (`domain_id`),
   CONSTRAINT `fk_ldap_trust_map__domain_id` FOREIGN KEY (`domain_id`) REFERENCES `domain` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+ALTER TABLE `cloud`.`domain_router` ADD COLUMN  update_state varchar(64) DEFAULT NULL;
+
