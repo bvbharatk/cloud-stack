@@ -1423,6 +1423,9 @@ public class ConsoleProxyManagerImpl extends ManagerBase implements ConsoleProxy
         cmds.addCommand("checkSsh", check);
 
         File uiFiles = new File("systemvm/js");
+        if(!uiFiles.exists()) {
+            uiFiles = new File("/usr/share/cloudstack-common/systemvm/js");
+        }
         if(uiFiles.exists() && uiFiles.isDirectory()) {
             CopyFileInVmCommand copyFile = new CopyFileInVmCommand("systemvm/js", "/usr/local/cloud/systemvm/js", controlNic.getIp4Address());
             cmds.addCommand("copyFile", copyFile);
