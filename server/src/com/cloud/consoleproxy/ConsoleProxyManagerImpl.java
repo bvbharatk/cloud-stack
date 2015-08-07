@@ -129,6 +129,7 @@ import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1422,16 +1423,20 @@ public class ConsoleProxyManagerImpl extends ManagerBase implements ConsoleProxy
         CheckSshCommand check = new CheckSshCommand(profile.getInstanceName(), controlNic.getIp4Address(), 3922);
         cmds.addCommand("checkSsh", check);
 
-        File uiFiles = new File("systemvm/js");
-        if(!uiFiles.exists()) {
-            uiFiles = new File("/usr/share/cloudstack-common/systemvm/js");
-        }
-        if(uiFiles.exists() && uiFiles.isDirectory()) {
-            CopyFileInVmCommand copyFile = new CopyFileInVmCommand("systemvm/js", "/usr/local/cloud/systemvm/js", controlNic.getIp4Address());
-            cmds.addCommand("copyFile", copyFile);
-        } else {
-            s_logger.error("Couldn't locate localization files for console proxy");
-            return false;
+        try {
+            File uiFiles = new File("systemvm/js");
+            if (!uiFiles.exists()) {
+                uiFiles = new File("/usr/share/cloudstack-common/systemvm/js");
+            }
+            if (uiFiles.exists() && uiFiles.isDirectory()) {
+                CopyFileInVmCommand copyFile = new CopyFileInVmCommand(uiFiles.getCanonicalPath(), "/usr/local/cloud/systemvm/js", controlNic.getIp4Address());
+                cmds.addCommand("copyFile", copyFile);
+            } else {
+                s_logger.error("Couldn't locate localization files for console proxy");
+                return false;
+            }
+        } catch (IOException e) {
+            s_logger.error("Failed to copy localization files for console proxy: " + e.getMessage());
         }
 
         return true;
@@ -1445,6 +1450,9 @@ public class ConsoleProxyManagerImpl extends ManagerBase implements ConsoleProxy
                     s_logger.warn("Unable to ssh to the VM: " + answer.getDetails());
                 } else {
                     s_logger.warn("Unable to ssh to the VM: null answer");
+                }
+                if(cmds.getAnswer("copyFile") == answer) {
+                    continue;
                 }
                 return false;
             }

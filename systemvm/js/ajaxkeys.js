@@ -16,7 +16,21 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+/*
+ * Below associative array contains the list of keyboard types which shares most of the keys with standard (US) keyboard
+ * e.g. UK, french
+ * If your keyboard type shares most of keys with standard (US) keyboard add it here
+ */
+var cookedKeyboardTypes = {"us":"Standard (US) keyboard",
+        "uk":"UK keyboard",
+        "fr":"French AZERTY keyboard"}
 
+/*
+ * Below associative array contains the list of raw keyboard types e.g. Japanese, Simplified Chinese
+ * If your keyboard type falls in this category add it here
+ */
+var rawKeyboardTypes = {"jp":"Japanese keyboard",
+        "sc":"Simplified Chinese keyboard"}
 /*
  * This var contains the limited keyboard translation tables.
  * This is the table that users can modify to make special keyboard to work properly.
@@ -25,6 +39,42 @@ under the License.
 
 //client event type. corresponds to events in ajaxviewer.
 
+//
+// RAW keyboard
+// 		Primarily translates KeyDown/KeyUp event, either as is (if there is no mapping entry)
+// 		or through mapped result.
+//
+// 		For KeyPress event, it translates it only if there exist a mapping entry
+// 		in jsX11KeysymMap map and the entry meets the condition
+//
+// COOKED keyboard
+//		Primarily translates KeyPress event, either as is or through mapped result
+//		It translates KeyDown/KeyUp only there exists a mapping entry, or if there
+//		is no mapping entry, translate when certain modifier key is pressed (i.e.,
+//		CTRL or ALT key
+//
+// Mapping entry types
+//		direct		:	will be directly mapped into the entry value with the same event type
+//		boolean		:	only valid for jsX11KeysymMap, existence of this type, no matter true or false
+//						in value, corresponding KeyDown/KeyUp event will be masked
+//		array		:	contains a set of conditional mapping entry
+//
+// Conditional mapping entry
+//
+//		{
+//			type: <event type>, code: <mapped key code>, modifiers: <modifiers>,
+//		  	shift : <shift state match condition>,		-- match on shift state
+//			guestos : <guest os match condition>,		-- match on guestos type
+//			browser: <browser type match condition>,	-- match on browser
+//			browserVersion: <brower version match condition>	-- match on browser version
+//			guestosDisplayName: <guest os display name condition>	-- matches on specific version of guest os
+//								provide the guest os display name substring to uniquely identify version
+//								for example if guestosDisplayName CentOS 5.2 (32-bit), then to match this condition
+//								give unique substring to identify like 5.2 or CentOS 5.2 etc.
+//			hypervisor: <hypervisor match condition>	--match on hypervisor
+//			hypervisorVersion: <hypervisor version match condition>	--match on hypervisor version
+//		}
+//
 
 //use java AWT key modifier masks
 JS_KEY_BACKSPACE = 8;

@@ -27,6 +27,20 @@ function StringBuilder(initStr) {
     this.append(initStr);
 }
 
+function isKeyContainedInArray(array, key) {
+    for (item in array) {
+        if(key == item) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function getLocaleDescription(locale) {
+	var description = locale in cookedKeyboardTypes? cookedKeyboardTypes[locale] : rawKeyboardTypes[locale];
+	$("#keyboard_label").append(description);
+}
+
 StringBuilder.prototype = {
 	append : function (str) {
 	    if (str) {
@@ -95,18 +109,25 @@ function KeyboardMapper() {
 //			guestos : <guest os match condition>,		-- match on guestos type
 //			browser: <browser type match condition>,	-- match on browser
 //			browserVersion: <brower version match condition>	-- match on browser version
+//			guestosDisplayName: <guest os display name condition>	-- matches on specific version of guest os
+//								provide the guest os display name substring to uniquely identify version
+//								for example if guestosDisplayName CentOS 5.2 (32-bit), then to match this condition
+//								give unique substring to identify like 5.2 or CentOS 5.2 etc.
+//			hypervisor: <hypervisor match condition>	--match on hypervisor
+//			hypervisorVersion: <hypervisor version match condition>	--match on hypervisor version
 //		}
 //
-KeyboardMapper.KEYBOARD_TYPE_RAW = 0;
+/*KeyboardMapper.KEYBOARD_TYPE_RAW = 0;
 KeyboardMapper.KEYBOARD_TYPE_COOKED = 1;
 KeyboardMapper.KEYBOARD_TYPE_UK = 2;
 KeyboardMapper.KEYBOARD_TYPE_FR = 3;
+*/
 
 KeyboardMapper.prototype = {
 
 	setKeyboardType : function(keyboardType) {
 		this.keyboardType = keyboardType;
-		if(keyboardType == KeyboardMapper.KEYBOARD_TYPE_COOKED || keyboardType == KeyboardMapper.KEYBOARD_TYPE_UK || keyboardType == KeyboardMapper.KEYBOARD_TYPE_FR) {
+		if(isKeyContainedInArray(cookedKeyboardTypes, this.keyboardType)) {
 			// initialize mapping for COOKED keyboard
 			this.jsX11KeysymMap[AjaxViewer.JS_KEY_CAPSLOCK] 		= AjaxViewer.X11_KEY_CAPSLOCK;
 			this.jsX11KeysymMap[AjaxViewer.JS_KEY_BACKSPACE] 		= AjaxViewer.X11_KEY_BACKSPACE;
@@ -150,7 +171,7 @@ KeyboardMapper.prototype = {
 															   {type: AjaxViewer.KEY_UP, code: 0x2f, modifiers: 0, shift: false }];
 		}
 	},
-	RawkeyboardInputHandler : function(eventType, code, modifiers, guestos, browser, browserVersion) {
+	RawkeyboardInputHandler : function(eventType, code, modifiers, guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion) {
 		if(eventType == AjaxViewer.KEY_DOWN || eventType == AjaxViewer.KEY_UP) {
 			
 			// special handling for Alt + Ctrl + Ins, convert it into Alt-Ctrl-Del
@@ -162,21 +183,21 @@ KeyboardMapper.prototype = {
 			}
 			
 			var X11Keysym = code;
-			if(this.jsX11KeysymMap[code] != undefined && (guestos == 'windows' || modifiers != AjaxViewer.SHIFT_KEY_MASK || code == AjaxViewer.JS_KEY_CAPSLOCK)) {
+			if(this.jsX11KeysymMap[code] != undefined && (guestos.toLowerCase() == 'windows' || modifiers != AjaxViewer.SHIFT_KEY_MASK || code == AjaxViewer.JS_KEY_CAPSLOCK)) {
 				X11Keysym = this.jsX11KeysymMap[code];
 				if(typeof this.jsX11KeysymMap[code] == "boolean") {
 					return;
 				} else if($.isArray(X11Keysym)) {
 					for(var i = 0; i < X11Keysym.length; i++) {
 					// How to set the guestos, browser, version value??? add later
-						if(this.isConditionalEntryMatched(eventType, code, modifiers, X11Keysym[i], guestos, browser, browserVersion)) {
+						if(this.isConditionalEntryMatched(eventType, code, modifiers, X11Keysym[i], guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion)) {
 							this.mappedInput.push(X11Keysym[i]);
 						}
 					}
 				} else {
 					this.mappedInput.push({type : eventType, code: X11Keysym, modifiers: modifiers});
 				}
-			} else if(guestos == 'windows' || ((modifiers & (AjaxViewer.CTRL_KEY_MASK | AjaxViewer.ALT_KEY_MASK)) != 0)){
+			} else if(guestos.toLowerCase() == 'windows' || ((modifiers & (AjaxViewer.CTRL_KEY_MASK | AjaxViewer.ALT_KEY_MASK)) != 0)){
 				this.mappedInput.push({type : eventType, code: X11Keysym, modifiers: modifiers});
 			}
 
@@ -184,7 +205,7 @@ KeyboardMapper.prototype = {
 			if(eventType == AjaxViewer.KEY_UP && (code == AjaxViewer.JS_KEY_ALT || code == AjaxViewer.JS_KEY_CTRL))
 				this.mappedInput.push({type : eventType, code: this.jsX11KeysymMap[code], modifiers: modifiers});
 			
-		} else if(eventType == AjaxViewer.KEY_PRESS && guestos == 'null') {
+		} else if(eventType == AjaxViewer.KEY_PRESS && guestos.toLowerCase() != 'windows') {
 			// ENTER/BACKSPACE key should already have been sent through KEY DOWN/KEY UP event
 			if(code == AjaxViewer.JS_KEY_ENTER || code == AjaxViewer.JS_KEY_BACKSPACE)
 				return;
@@ -194,7 +215,7 @@ KeyboardMapper.prototype = {
 			if(X11Keysym) {
 				if($.isArray(X11Keysym)) {
 					for(var i = 0; i < X11Keysym.length; i++) {
-						if(this.isConditionalEntryMatched(eventType, code, modifiers, X11Keysym[i], guestos, browser))
+						if(this.isConditionalEntryMatched(eventType, code, modifiers, X11Keysym[i], guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion))
 							this.mappedInput.push(X11Keysym[i]);
 					}
 				} else {
@@ -208,7 +229,7 @@ KeyboardMapper.prototype = {
 		}
 	},
 	
-	CookedKeyboardInputHandler : function(eventType, code, modifiers, guestos, browser, browserVersion) {
+	CookedKeyboardInputHandler : function(eventType, code, modifiers, guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion) {
 		if(eventType == AjaxViewer.KEY_DOWN || eventType == AjaxViewer.KEY_UP) {
 			
 			// special handling for Alt + Ctrl + Ins, convert it into Alt-Ctrl-Del
@@ -226,7 +247,7 @@ KeyboardMapper.prototype = {
 					return;
 				} else if($.isArray(X11Keysym)) {
 					for(var i = 0; i < X11Keysym.length; i++) {
-						if(this.isConditionalEntryMatched(eventType, code, modifiers, X11Keysym[i], guestos, browser, browserVersion)) {
+						if(this.isConditionalEntryMatched(eventType, code, modifiers, X11Keysym[i], guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion)) {
 							this.mappedInput.push(X11Keysym[i]);
 						}
 					}
@@ -270,7 +291,7 @@ KeyboardMapper.prototype = {
 				if(X11Keysym) {
 					if($.isArray(X11Keysym)) {
 						for(var i = 0; i < X11Keysym.length; i++) {
-							if(this.isConditionalEntryMatched(eventType, code, modifiers, X11Keysym[i], guestos, browser))
+							if(this.isConditionalEntryMatched(eventType, code, modifiers, X11Keysym[i], guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion))
 								this.mappedInput.push(X11Keysym[i]);
 						}
 					} else {
@@ -286,11 +307,11 @@ KeyboardMapper.prototype = {
 		}
 	},
 	
-	inputFeed : function(eventType, code, modifiers, guestos, browser, browserVersion) {
-		if(this.keyboardType == KeyboardMapper.KEYBOARD_TYPE_RAW)
-			this.RawkeyboardInputHandler(eventType, code, modifiers, guestos, browser, browserVersion);
+	inputFeed : function(eventType, code, modifiers, guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion) {
+		if(isKeyContainedInArray(rawKeyboardTypes, this.keyboardType))
+			this.RawkeyboardInputHandler(eventType, code, modifiers, guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion);
 		else
-			this.CookedKeyboardInputHandler(eventType, code, modifiers, guestos, browser, browserVersion);
+			this.CookedKeyboardInputHandler(eventType, code, modifiers, guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion);
 	},
 	
 	getMappedInput : function() {
@@ -299,7 +320,7 @@ KeyboardMapper.prototype = {
 		return mappedInput;
 	},
 	
-	isConditionalEntryMatched : function(eventType, code, modifiers, entry, guestos, browser, browserVersion) {
+	isConditionalEntryMatched : function(eventType, code, modifiers, entry, guestos, browser, browserVersion, guestosDisplayName, hypervisor, hypervisorVersion) {
 		if(eventType == AjaxViewer.KEY_DOWN || eventType == AjaxViewer.KEY_UP) {
 			// for KeyDown/KeyUp events, we require that the type in entry should match with
 			// the real input
@@ -322,20 +343,34 @@ KeyboardMapper.prototype = {
                 }
 
 		if(entry.guestos != undefined) {
-			if(entry.guestos != guestos)
+			if(entry.guestos.toLowerCase() != guestos.toLowerCase())
 				return false;
 		}
 		
 		if(entry.browser != undefined) {
-			if(entry.browser != browser)
+			if(entry.browser.toLowerCase() != browser.toLowerCase())
 				return false;
 		}
 		
 		if(entry.browserVersion != undefined) {
-			if(entry.browserVersion != browserVersion)
+			if(entry.browserVersion.toLowerCase() != browserVersion.toLowerCase())
 				return false;
 		}
-		
+
+		if(entry.guestosDisplayName != undefined) {
+        			if(guestosDisplayName.toLowerCase().indexOf(entry.guestosDisplayName.toLowerCase()) >= 0)
+        				return false;
+        }
+
+        if(entry.hypervisor != undefined) {
+        			if(entry.browser.hypervisor() != hypervisor.toLowerCase())
+        				return false;
+        }
+
+        if(entry.hypervisorVersion != undefined) {
+        			if(entry.hypervisorVersion.toLowerCase() != hypervisorVersion.toLowerCase())
+        				return false;
+        }
 		return true;
 	},
 	
@@ -347,7 +382,8 @@ KeyboardMapper.prototype = {
 /////////////////////////////////////////////////////////////////////////////
 // class AjaxViewer
 //
-function AjaxViewer(panelId, imageUrl, updateUrl, locale, guestos, tileMap, width, height, tileWidth, tileHeight) {
+function AjaxViewer(panelId, imageUrl, updateUrl, locale, guestos, guestosDisplayName, hypervisor, hypervisorVersion,
+	tileMap, width, height, tileWidth, tileHeight) {
 	// logging is disabled by default so that it won't have negative impact on performance
 	// however, a back door key-sequence can trigger to open the logger window, it is designed to help
 	// trouble-shooting
@@ -368,17 +404,16 @@ function AjaxViewer(panelId, imageUrl, updateUrl, locale, guestos, tileMap, widt
 	this.updateUrl = updateUrl;
 	this.tileMap = tileMap;
 	this.guestos = guestos;
+	this.guestosDisplayName = guestosDisplayName;
+	this.hypervisor = hypervisor;
+	this.hypervisorVersion = hypervisorVersion;
 	this.dirty = true;
 	this.width = width;
 	this.height = height;
 	this.tileWidth = tileWidth;
 	this.tileHeight = tileHeight;
 	this.maxTileZIndex = 1;
-
-	if (locale == AjaxViewer.KEYBOARD_TYPE_UK_ENGLISH || locale == AjaxViewer.KEYBOARD_TYPE_JAPANESE || locale == AjaxViewer.KEYBOARD_TYPE_FRENCH)
-		this.currentKeyboard = locale;
-	else
-		this.currentKeyboard = AjaxViewer.KEYBOARD_TYPE_ENGLISH;
+	this.currentKeyboard = locale;
 
 	this.keyboardMappers = [];
 	
@@ -424,10 +459,11 @@ AjaxViewer.STATUS_RECEIVED = 2;
 AjaxViewer.STATUS_SENDING = 3;
 AjaxViewer.STATUS_SENT = 4;
 
-AjaxViewer.KEYBOARD_TYPE_ENGLISH = "us";
+/*AjaxViewer.KEYBOARD_TYPE_ENGLISH = "us";
 AjaxViewer.KEYBOARD_TYPE_UK_ENGLISH = "uk";
 AjaxViewer.KEYBOARD_TYPE_JAPANESE = "jp";
 AjaxViewer.KEYBOARD_TYPE_FRENCH = "fr";
+*/
 
 AjaxViewer.JS_KEY_BACKSPACE = 8;
 AjaxViewer.JS_KEY_TAB = 9;
@@ -685,7 +721,19 @@ AjaxViewer.prototype = {
 	setupKeyboardTranslationTable : function() {
 		this.keyboardMappers = [];
 		
-		var mapper = new KeyboardMapper();
+		var mapper = null;
+            for (key in cookedKeyboardTypes) {
+            mapper = new KeyboardMapper();
+            this.keyboardMappers[key] = mapper;
+            mapper.setKeyboardType(key);
+        }
+
+        for (key in rawKeyboardTypes) {
+            mapper = new KeyboardMapper();
+            this.keyboardMappers[key] = mapper;
+            mapper.setKeyboardType(key);
+        }
+		/*var mapper = new KeyboardMapper();
 		this.keyboardMappers[AjaxViewer.KEYBOARD_TYPE_ENGLISH] = mapper;
 		mapper.setKeyboardType(KeyboardMapper.KEYBOARD_TYPE_COOKED);
 
@@ -700,6 +748,7 @@ AjaxViewer.prototype = {
                 var mapper = new KeyboardMapper();
                 this.keyboardMappers[AjaxViewer.KEYBOARD_TYPE_FRENCH] = mapper;
                 mapper.setKeyboardType(KeyboardMapper.KEYBOARD_TYPE_FR);
+        */
 
 		// JP keyboard plugged in a English host OS
 /*		
@@ -766,7 +815,7 @@ AjaxViewer.prototype = {
 			for (var j = 0; j < x11Maps.length; j++) {
 				var code = x11Maps[j].keycode;
 				var mappedEntry = x11Maps[j].entry;
-				if(x11Maps[j].guestos == undefined || x11Maps[j].guestos == this.guestos) {
+				if(x11Maps[j].guestos == undefined || x11Maps[j].guestos.toLowerCase() == this.guestos.toLowerCase()) {
 					this.keyboardMappers[keyboardType].jsX11KeysymMap[code] = mappedEntry;
 				}
 			}
@@ -774,7 +823,7 @@ AjaxViewer.prototype = {
 			for (var j = 0; j < keyPressMaps.length; j++) {
 				var code = keyPressMaps[j].keycode;
 				var mappedEntry = keyPressMaps[j].entry;
-				if(keyPressMaps[j].guestos == undefined || keyPressMaps[j].guestos == this.guestos) {
+				if(keyPressMaps[j].guestos == undefined || keyPressMaps[j].guestos.toLowerCase() == this.guestos.toLowerCase()) {
 					this.keyboardMappers[keyboardType].jsKeyPressX11KeysymMap[code] = mappedEntry;
 				}
 			}
@@ -826,19 +875,7 @@ AjaxViewer.prototype = {
 	},
 	
 	onCommand : function(cmd) {
-		if(cmd == "keyboard_jp") {
-			$("#toolbar").find(".pulldown").find("ul").hide();
-			this.currentKeyboard = AjaxViewer.KEYBOARD_TYPE_JAPANESE;
-		} else if(cmd == "keyboard_us") {
-			$("#toolbar").find(".pulldown").find("ul").hide();
-			this.currentKeyboard = AjaxViewer.KEYBOARD_TYPE_ENGLISH;
-		} else if(cmd == "keyboard_uk") {
-			$("#toolbar").find(".pulldown").find("ul").hide();
-			this.currentKeyboard = AjaxViewer.KEYBOARD_TYPE_UK_ENGLISH;
-                } else if(cmd == "keyboard_fr") {
-                        $("#toolbar").find(".pulldown").find("ul").hide();
-                        this.currentKeyboard = AjaxViewer.KEYBOARD_TYPE_FRENCH;
-		} else if(cmd == "sendCtrlAltDel") {
+		if(cmd == "sendCtrlAltDel") {
 			this.sendKeyboardEvent(AjaxViewer.KEY_DOWN, 0xffe9, 0);		// X11 Alt
 			this.sendKeyboardEvent(AjaxViewer.KEY_DOWN, 0xffe3, 0);		// X11 Ctrl
 			this.sendKeyboardEvent(AjaxViewer.KEY_DOWN, 0xffff, 0);		// X11 Del
@@ -1364,7 +1401,7 @@ AjaxViewer.prototype = {
 	
 	dispatchKeyboardInput : function(event, code, modifiers) {
 		var keyboardMapper = ajaxViewer.getCurrentKeyboardMapper();
-		keyboardMapper.inputFeed(event, code, modifiers, this.guestos, $.browser, $.browser.version);
+		keyboardMapper.inputFeed(event, code, modifiers, this.guestos, $.browser, $.browser.version, this.guestosDisplayName, this.hypervisor, this.hypervisorVersion);
 		this.dispatchMappedKeyboardInput(keyboardMapper.getMappedInput());
 	},
 	
