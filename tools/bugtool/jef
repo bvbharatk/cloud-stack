@@ -1,0 +1,22 @@
+#!/bin/bash
+
+logfile=$1
+
+if [ -z $logfile ] || [ ! -f $logfile ]
+then
+	echo "Need a log file to proceed."
+	exit
+fi
+
+x=0;
+exarr=()
+for Te in $( zgrep "Exception while executing" $logfile | awk '{print$2}' )
+do
+	echo "==> EXCEPTION $x BEGIN"
+	zgrep --colour -n  -B 1  "$Te" $logfile  -m 1
+	zgrep --colour -n  -A 20 "$Te" $logfile | grep "\sat\ "
+	echo "==> EXCEPTION $x END"
+	echo
+	let x=$x+1;
+done
+

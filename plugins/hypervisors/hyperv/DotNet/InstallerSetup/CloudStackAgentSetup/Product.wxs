@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension" xmlns:iis='http://schemas.microsoft.com/wix/IIsExtension' xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <?include Version.wxi ?>
+  <Product Id="$(var.ProductCode)" Name="$(var.ProductName)" Language="1033" Version="$(var.ProductVersion)" Manufacturer="$(var.Company)" UpgradeCode="$(var.UpgradeCode)">
+    <Package Id="*" InstallerVersion="200" Compressed="yes" InstallScope="perMachine" InstallPrivileges="elevated"/>
+    <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
+    <Media Id="1" Cabinet="Cab1.cab" EmbedCab="yes" />
+
+    <Property Id="PREVIOUSVERSIONSINSTALLED" Secure="yes" />
+    <Property Id="NEWERVERSIONSINSTALLED" Secure="yes" />
+    <Property Id="SAMEVERSIONSINSTALLED" Secure="yes" />
+    <Upgrade Id="$(var.UpgradeCode)">
+      <UpgradeVersion Minimum="0.1.0.0" Maximum="$(var.ProductVersion)"
+                      Property="PREVIOUSVERSIONSINSTALLED"
+                      IncludeMinimum="yes" IncludeMaximum="no" />
+      <UpgradeVersion Minimum="$(var.ProductVersion)" Maximum="99.0.0.0"
+                      Property="NEWERVERSIONSINSTALLED"
+                      IncludeMinimum="yes" IncludeMaximum="yes" />
+      <UpgradeVersion Minimum="$(var.ProductVersion)" Maximum="$(var.ProductVersion)"
+                      Property="SAMEVERSIONSINSTALLED"
+                      IncludeMinimum="yes" IncludeMaximum="yes" />
+    </Upgrade>
+
+    <Property Id="CSUPDOWNGRADE" Value="Update"/>
+    <Property Id="INSTALL_CERTIFICATE" Value="True"/>
+    <Property Id="UI" Value="noUi"/>
+
+    <InstallExecuteSequence>
+      <RemoveExistingProducts Before="InstallInitialize" />
+      <Custom Action='InstallCertificate' After='InstallFiles'>INSTALL_CERTIFICATE = "True" AND NOT Installed AND NOT PREVIOUSVERSIONSINSTALLED AND NOT NEWERVERSIONSINSTALLED AND NOT SAMEVERSIONSINSTALLED AND UI="noUi"</Custom>
+    </InstallExecuteSequence>
+
+    <Feature Id="ProductFeature" Title="Apache CloudStack Hyper-V Agent" Level="1" AllowAdvertise='no' Absent='disallow' Description="This component will help the CloudStack management server to communicate and manage the Hyper-V host.">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+
+    <WixVariable Id="WixUILicenseRtf" Value="EULA.rtf" />
+    <UIRef Id="WixUI_ErrorProgressText"/>
+    <UIRef Id="WixUI_Common" />
+    <UIRef Id="CSUI_FeatureTree"/>
+  </Product>
+  <Fragment>
+    <Binary Id="ACS.CA.dll" SourceFile="..\ACS\bin\Debug\ACS.CA.dll" />
+    <CustomAction Id="InstallCertificate" Return="check" Execute="immediate" BinaryKey="ACS.CA.dll" DllEntry="InstallCertificate"/>
+  </Fragment>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="CloudStack Hyper-V Agent" />
+      </Directory>
+    </Directory>
+  </Fragment>
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="ProductComponent" Guid="48dc066c-52cc-5678-8fa3-52bbe195e077">
+        <File Id="AgentShell.exe" Name="AgentShell.exe" Source="..\..\ServerResource\AgentShell\bin\Debug\AgentShell.exe" Vital="yes" KeyPath="yes" DiskId="1"/>
+        <fire:FirewallException Id="FWX3" Name="Hyperv Agent" Port="8250" Protocol="tcp"  Scope="localSubnet"/>
+        <ServiceInstall
+            Id="ServiceInstaller"
+            Type="ownProcess"
+            Vital="yes"
+            Name="CloudStack Hyper-V Agent"
+            DisplayName="CloudStack Hyper-V Agent"
+            Description="CloudStack Agent for managing a hyper-v host"
+            Start="auto"
+            Account="[SERVICE_USERNAME]"
+            Password="[SERVICE_PASSWORD]"
+            ErrorControl="ignore"
+            Interactive="no">
+          <util:ServiceConfig
+            FirstFailureActionType="restart"
+            SecondFailureActionType="restart"
+            ThirdFailureActionType="restart"/>
+        </ServiceInstall>
+
+        <ServiceControl Id="StartService" Start="install" Stop="both" Remove="uninstall" Name="CloudStack Hyper-V Agent" Wait="yes" />
+      </Component>
+
+      <Component Id="AWSSDK" Guid="48dc066c-97cc-8078-8fa3-52bbe455e077">
+        <File Id="AWSSDK.dll" Name="AWSSDK.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\AWSSDK.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="HypervResource" Guid="48dc066c-67cc-5908-8fa3-52bbe195e077">
+        <File Id="HypervResource.dll" Name="HypervResource.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\HypervResource.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="IonicZip" Guid="48dc066c-97cc-4378-8fa3-52bbe156e077">
+        <File Id="Ionic.Zip.dll" Name="Ionic.Zip.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\Ionic.Zip.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="log4net" Guid="48dc066c-97cc-1278-8fa3-52bbe675e077">
+        <File Id="log4net.dll" Name="log4net.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\log4net.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="NewtonsoftJson" Guid="48dc066c-97cc-1178-8fa3-92bbe195e077">
+        <File Id="Newtonsoft.Json.dll" Name="Newtonsoft.Json.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\Newtonsoft.Json.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="SystemNetHttpForwarding" Guid="48dc099c-97cc-8678-8fa3-52bbe195e077">
+        <File Id="System.Net.Http.Formatting.dll" Name="System.Net.Http.Formatting.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\System.Net.Http.Formatting.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="SystemWebHttp" Guid="48dc066c-97cc-8878-8fa3-12bbe195e077">
+        <File Id="System.Web.Http.dll" Name="System.Web.Http.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\System.Web.Http.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="SystemWebHttpSelfHost" Guid="48dc077c-97cc-0978-8fa3-52bbe195e077">
+        <File Id="System.Web.Http.SelfHost.dll" Name="System.Web.Http.SelfHost.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\System.Web.Http.SelfHost.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="WmiWrappers" Guid="48dc066c-97cc-6678-8fa3-93bbe195e077">
+        <File Id="WmiWrappers.dll" Name="WmiWrappers.dll" Source="..\..\ServerResource\AgentShell\bin\Debug\WmiWrappers.dll" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="AgentShellConfig" Guid="48dc066c-99cc-8978-8fa3-52bbe195e077">
+        <File Id="AgentShell.exe.config" Name="AgentShell.exe.config" Source="..\..\ServerResource\AgentShell\bin\Debug\AgentShell.exe.config" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+      <Component Id="heartbeat" Guid="48dc066c-97cc-6678-8fa3-63bbe195e077">
+        <File Id="heartbeat.bat" Name="heartbeat.bat" Source="..\..\ServerResource\AgentShell\bin\Debug\heartbeat.bat" Vital="yes" KeyPath="yes" DiskId="1"/>
+      </Component>
+
+    </ComponentGroup>
+  </Fragment>
+</Wix>

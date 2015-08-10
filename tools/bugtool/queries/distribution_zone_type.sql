@@ -1,0 +1,1 @@
+select networktype Type, count(*) from data_center group by networktype;

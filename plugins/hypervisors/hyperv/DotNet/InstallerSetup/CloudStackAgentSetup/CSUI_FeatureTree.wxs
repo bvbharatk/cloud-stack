@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Thank you for installing." />
+    <UI Id="CSUI_FeatureTree">
+      <Property Id="WixUI_Mode" Value="FeatureTree" />
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="CredentialsDlg" />
+      <DialogRef Id="CertificateDlg"/>
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Property="CSUPDOWNGRADE" Value="Upgrade">PREVIOUSVERSIONSINSTALLED AND NOT NEWERVERSIONSINSTALLED AND NOT SAMEVERSIONSINSTALLED</Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Property="CSUPDOWNGRADE"  Value="Downgrade">NOT PREVIOUSVERSIONSINSTALLED AND NEWERVERSIONSINSTALLED AND NOT SAMEVERSIONSINSTALLED</Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Property="CSUPDOWNGRADE"  Value="Update">NOT PREVIOUSVERSIONSINSTALLED AND NOT NEWERVERSIONSINSTALLED AND SAMEVERSIONSINSTALLED</Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Property="UI"  Value="ui"/>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg">NOT Installed AND NOT PREVIOUSVERSIONSINSTALLED AND NOT NEWERVERSIONSINSTALLED AND NOT SAMEVERSIONSINSTALLED</Publish>
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="CustomizeDlg">LicenseAccepted = "1"</Publish>
+      <Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="1">Installed</Publish>
+      <Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" Order="2">NOT Installed</Publish>
+      <Publish Dialog="CustomizeDlg" Control="Next" Event="NewDialog" Value="CredentialsDlg" Order="1">1</Publish>
+      <Publish Dialog="CredentialsDlg" Control="Back" Event="NewDialog" Value="CustomizeDlg">NOT Installed</Publish>
+      <Publish Dialog="CredentialsDlg" Control="Back" Event="NewDialog" Value="UpgradeDowngradeDlg">PREVIOUSVERSIONSINSTALLED OR NEWERVERSIONSINSTALLED OR SAMEVERSIONSINSTALLED</Publish>
+      <Publish Dialog="CredentialsDlg" Control="Next" Event="NewDialog" Value="CertificateDlg">NOT Installed</Publish>
+      <Publish Dialog="CredentialsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">PREVIOUSVERSIONSINSTALLED OR NEWERVERSIONSINSTALLED OR SAMEVERSIONSINSTALLED</Publish>
+      <Publish Dialog="CertificateDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="CertificateDlg" Control="Back" Event="NewDialog" Value="CredentialsDlg">1</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Install" Event="DoAction" Value="InstallCertificate">INSTALL_CERTIFICATE AND NOT Installed AND NOT PREVIOUSVERSIONSINSTALLED AND NOT NEWERVERSIONSINSTALLED AND NOT SAMEVERSIONSINSTALLED AND UI="ui"</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CredentialsDlg" Order="2">PREVIOUSVERSIONSINSTALLED OR NEWERVERSIONSINSTALLED OR SAMEVERSIONSINSTALLED</Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="UpgradeDowngradeDlg">PREVIOUSVERSIONSINSTALLED OR NEWERVERSIONSINSTALLED OR SAMEVERSIONSINSTALLED</Publish>
+      <Publish Dialog="UpgradeDowngradeDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg"/>
+      <Publish Dialog="UpgradeDowngradeDlg" Control="Next" Event="NewDialog" Value="CredentialsDlg"/>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="CertificateDlg" Order="1">NOT Installed OR WixUI_InstallMode = "Change"</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2">Installed</Publish>
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="ChangeButton" Event="NewDialog" Value="CustomizeDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
+    </UI>
+  </Fragment>
+</Wix>

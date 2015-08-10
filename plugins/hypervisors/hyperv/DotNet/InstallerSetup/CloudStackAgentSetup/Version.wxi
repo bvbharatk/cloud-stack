@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Include>
+  <?define ProductName = "CloudStack Hyper-V Agent"?>
+  <?define ProductCode = "*"?>
+  <?define UpgradeCode = "48dc066c-97cc-4512-8fa3-52bbe195e077"?>
+  <?define ProductVersion = "1.0.0.0"?>
+  <?define PackageCode = "*"?>
+  <?define Company = "Citrix Systems, Inc."?>
+</Include> 
+

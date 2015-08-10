@@ -1,0 +1,2 @@
+SHOW VARIABLES;
+

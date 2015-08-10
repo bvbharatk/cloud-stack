@@ -1,0 +1,122 @@
+/*[fmt]1C20-1C0D-E*/
+body.login {
+  background: url(../../images/overlay-pattern.png) repeat center, #351A61 url(gradient.jpg) no-repeat center;
+  background-size: auto, cover;
+}
+
+div.login {
+  background: rgba(15, 7, 25, 0.8);
+}
+
+.login .footer {
+  width: 100px;
+  height: 100px;
+  background-image: url('logo-brand-bar.png'), url('brand-bar.png');
+  background-repeat: no-repeat, repeat-x;
+  background-position: center, center;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  z-index: 1000;
+}
+
+.login form {
+  background: none;
+}
+
+.login form .logo {
+  background-image: url('logo-login.png') !important;
+  width: 340px !important;
+  height: 56px !important;
+  margin-left: 140px;
+}
+
+#citrix-logo {
+  width: 50px;
+  height: 19px;
+  background: url('citrix-logo.png') no-repeat center;
+  position: absolute;
+  left: 975px;
+  top: -40px;
+}
+
+#user {
+  left: 820px;
+}
+
+#header div.notifications {
+  left: -245px;
+}
+
+#header {
+  background: url(../../images/overlay-pattern.png) repeat center, #351A61 url(header-gradient.png) no-repeat center;
+  background-size: auto, cover;
+}
+
+#header div.controls {
+  box-shadow: 0px -1px 6px #000000 !important;
+  border: 1px solid #666666;
+  border-radius: 5px;
+}
+
+#header div.logo {
+  background: url('logo.png') no-repeat left !important;
+}
+
+#navigation ul li:hover,
+#navigation ul li.active {
+  background: #684A99;
+}
+
+.login .fields input[type=submit] {
+  cursor: pointer;
+  padding: 0;
+  background: #875FCE;
+  /*Old browsers*/
+  background: -moz-linear-gradient(top, #875fce 0%, #6729cf 100%);
+  /*FF3.6+*/
+  background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#875fce), color-stop(100%,#6729cf));
+  /*Chrome,Safari4+*/
+  background: -webkit-linear-gradient(top, #875fce 0%,#6729cf 100%);
+  /*Chrome10+,Safari5.1+*/
+  background: -o-linear-gradient(top, #875fce 0%,#6729cf 100%);
+  /*Opera 11.10+*/
+  background: -ms-linear-gradient(top, #875fce 0%,#6729cf 100%);
+  /*IE10+*/
+  background: linear-gradient(to bottom, #875fce 0%,#6729cf 100%);
+  /*W3C*/
+  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#875fce', endColorstr='#6729cf',GradientType=0 );
+  /*IE6-9*/
+  /*+box-shadow:0px 1px 3px #000000;*/
+  -moz-box-shadow: 0px 1px 3px #000000;
+  -webkit-box-shadow: 0px 1px 3px #000000;
+  -o-box-shadow: 0px 1px 3px #000000;
+  box-shadow: 0px 1px 3px #000000;
+  border: 1px solid #000000;
+}
+
+.login .fields input[type=submit]:hover {
+  /*+box-shadow:inset 0px 0px 4px #000000;*/
+  -moz-box-shadow: inset 0px 0px 4px #000000;
+  -webkit-box-shadow: inset 0px 0px 4px #000000;
+  -o-box-shadow: inset 0px 0px 4px #000000;
+  box-shadow: inset 0px 0px 4px #000000;
+  background: #7846BC;
+}
+
+.eula-container {
+  width: 100%;
+  height: 600px;
+  overflow: auto;
+}
+
+.eula-container pre {
+  width: 100%;
+  height: 100%;
+  white-space: pre-wrap;       /* css-3 */
+  white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+  white-space: -pre-wrap;      /* Opera 4-6 */
+  white-space: -o-pre-wrap;    /* Opera 7 */
+  word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
+

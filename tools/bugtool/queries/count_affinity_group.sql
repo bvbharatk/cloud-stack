@@ -1,0 +1,1 @@
+select count(*) Count from affinity_group;

@@ -1,0 +1,81 @@
+
+    ======================= cloud-bugtool =======================
+
+
+ABOUT:
+        Log Collection Utility cloud-bugtool.
+
+    The main purpose behind cloud-bugtool is to make easier collecting
+    logs required for CloudStack/CloudPlatform troubleshooting
+    and it mainly comes from Support. For those familiar with Xen/XenServer
+    cloud-bugtool name may sound similar to xen-bugtool, this similarity
+    is intentional.
+
+    Current version of cloud-bugtool collects:
+     - basic system and environment information
+     - CP/CS management service logs
+     - basic system logs
+     - cloud database
+
+        We DO NOT collect and do not want to collect any sensitive information.
+    If there is still any sensitive pice of information please let us know
+    and we will try to remove it or replace by meaningless data.
+
+REQUIREMENTS:
+        cloud-bugtool generally be can be run on any system where CloudPlatform
+    (CloudStack) has been installed yet. Although it requires to be run with
+    root privilages.
+
+INSTALLATION:
+        1. Copy onto CloudPlatform (CloudStack) system.
+        2. chmod +x cloud-bugtool
+        3. ./cloud-bugtool
+
+HELP:
+        In current version cloud-bugtool has few options which allow to specyfy
+    which data will be collected. For more information please run cloud-bugtool
+    with [-h|--help], it displays a usage message on standard output and exit.
+    Just execute cloud-bugtool and it collects information from below list
+    of CloudStack subsystems:
+        - database (cloud database dump)
+        - logs, content of /var/log/
+        - basic system settings including networking
+        - information from service vms (this is not implemented yet)
+    All above is compressed, written to .zip file and the archive location
+    is printed on user console.
+
+
+TODO:
+  - service VM subsystem implementation aka get the logs and other info
+    from service VMs (router, proxy, storage VM)
+  - better handling needs to be implemented for all subprocess calls
+    add proper exception handling
+  - operations on files and dirs, change to shutil module
+  - this version works only with cloud 3.0.x and only when password
+    is encrypted and saved in a file, other types of db pass storing
+    not implemented
+  - add the most popular imports to top of the file
+       grep import * | awk '{print $5}' | sort
+  - Manifest file: cloud-bugtool version, local execution date
+  - detect subsystem results FAILED, OK
+
+
+
+
+
+
+
+
+    =========================== jef =============================
+
+
+ABOUT:
+	jef - Java Exception Finder
+	   How often the only thing you need is to quickly find a Java
+	exception in your logs? jef is a very simple bash script which
+	let you quickly find all Java exceptions in your logs.
+	Like I said jef is _very_ simple tools and not optimal but it does
+	what it supposes to do for me, so hopefully for you too.
+
+TODO:
+	- make it smarter and more optimal
