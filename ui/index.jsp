@@ -461,11 +461,7 @@
                                         </div>
                                         <div class="value">
                                             <select name="keyboardLanguage">
-                                                <option value=""></option>
-                                                <option value="us"><fmt:message key="label.standard.us.keyboard" /></option>
-                                                <option value="uk"><fmt:message key="label.uk.keyboard" /></option>
-                                                <option value="jp"><fmt:message key="label.japanese.keyboard" /></option>
-                                                <option value="sc"><fmt:message key="label.simplified.chinese.keyboard" /></option>
+                                                <%@ include file="consoleKeyboardOptions.jsp" %>
                                             </select>
                                         </div>
                                     </div>
