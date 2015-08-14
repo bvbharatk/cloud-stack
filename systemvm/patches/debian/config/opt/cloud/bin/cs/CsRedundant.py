@@ -299,7 +299,7 @@ class CsRedundant(object):
         lines = []
         for o in self.address.get_ips():
             if o.needs_vrrp():
-                str = "        %s brd %s dev %s\n" % (o.get_gateway_cidr(), o.get_broadcast(), o.get_device())
+                str = "        %s brd %s dev %s\n" % (o.get_ip(), o.get_broadcast(), o.get_device())
                 lines.append(str)
                 self.check_is_up(o.get_device())
         return lines
