@@ -410,3 +410,8 @@ CREATE TABLE `cloud`.`ldap_trust_map` (
   KEY `fk_ldap_trust_map__domain_id` (`domain_id`),
   CONSTRAINT `fk_ldap_trust_map__domain_id` FOREIGN KEY (`domain_id`) REFERENCES `domain` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT IGNORE INTO `cloud`.`guest_os` (id, uuid, category_id, display_name, created) VALUES (255, UUID(), 7, 'CoreOS', utc_timestamp());
+INSERT IGNORE INTO `cloud`.`guest_os_hypervisor` (uuid,hypervisor_type, hypervisor_version, guest_os_name, guest_os_id, created, is_user_defined) VALUES (UUID(),'XenServer', 'default', 'CoreOS', 255, utc_timestamp(), 0);
+INSERT IGNORE INTO `cloud`.`guest_os_hypervisor` (uuid,hypervisor_type, hypervisor_version, guest_os_name, guest_os_id, created, is_user_defined) VALUES (UUID(),'VmWare', 'default', 'coreos64Guest', 255, utc_timestamp(), 0);
+INSERT IGNORE INTO `cloud`.`guest_os_hypervisor` (uuid,hypervisor_type, hypervisor_version, guest_os_name, guest_os_id, created, is_user_defined) VALUES (UUID(),'KVM', 'default', 'CoreOS', 252, utc_timestamp(), 0);
