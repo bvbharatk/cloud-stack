@@ -94,6 +94,8 @@ class CsCmdLine(CsDataBag):
     def get_vpccidr(self):
         if "vpccidr" in self.idata():
             return self.idata()['vpccidr']
+        elif "eth2ip" in self.idata():
+            return self.idata()['eth2ip']
         else:
             return "unknown"
 
@@ -130,7 +132,7 @@ class CsCmdLine(CsDataBag):
         This is slightly difficult to happen, but if it does, destroy the router with the password generated with the
         code below and restart the VPC with out the clean up option.
         '''
-        passwd = "%s-%s" % (self.get_vpccidr, self.get_router_id())
+        passwd = "%s-%s" % (self.get_vpccidr(), self.get_router_id())
         md5 = hashlib.md5()
         md5.update(passwd)
         return md5.hexdigest()
