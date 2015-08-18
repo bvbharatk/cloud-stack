@@ -1025,58 +1025,11 @@ namespace HypervResource
                     else if (poolType == StoragePoolType.NetworkFilesystem ||
                         poolType == StoragePoolType.SMB)
                     {
-                        if ((bool)cmd.add)
-                        {
-                            NFSTO share = new NFSTO();
-                            String uriStr = "cifs://" + (string)cmd.pool.host + (string)cmd.pool.path;
-                            share.uri = new Uri(uriStr);
-                            hostPath = Utils.NormalizePath(share.UncPath);
-
-                            // Check access to share.
-                            Utils.GetShareDetails(hostPath, out capacityBytes, out availableBytes);
-                            config.setPrimaryStorage((string)cmd.pool.uuid, hostPath);
-                        }
-                        else
-                        {
-                            config.removePrimaryStorage((string)cmd.pool.uuid);
-                        }
+                        AddOrRemoveSmb(cmd, ref capacityBytes, ref availableBytes, ref hostPath);
                     }
                     else if (poolType == StoragePoolType.PreSetup)
                     {
-                        if ((bool)cmd.add)
-                        {
-                            hostPath = config.getPrimaryStorage((string)cmd.pool.uuid);
-                            if (hostPath == null)
-                            {
-                                logger.Info("Adding cluster shared volume");
-                                try
-                                {
-                                    try
-                                    {
-                                        hostPath = wmiCallsV2.FindClusterSharedVolume((string)cmd.pool.path);
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        logger.Error("Disk is not already added to CSV " + e.Message);
-                                    }
-                                    config.setPrimaryStorage((string)cmd.pool.uuid, hostPath);
-                                }
-                                catch (Exception e)
-                                {
-                                    result = false;
-                                    details = e.Message;
-                                }
-                            }
-
-                            if (hostPath != null)
-                            {
-                                Utils.GetShareDetails(hostPath, out capacityBytes, out availableBytes);
-                            }
-                        }
-                        else
-                        {
-                            config.removePrimaryStorage((string)cmd.pool.uuid);
-                        }
+                        AddOrRemoveCsv(cmd, ref details, ref capacityBytes, ref availableBytes, ref hostPath, ref result);
                     }
                     else
                     {
@@ -1115,26 +1068,88 @@ namespace HypervResource
 
                 if (!wmiCallsV2.IsClusterPresent() && result)
                 {
-                    try
-                    {
-                        if ((bool)cmd.add)
-                        {
-                            logger.Info("Adding HeartBeat Task to task scheduler for pool " + (string)cmd.pool.uuid);
-                            Utils.AddHeartBeatTask((string)cmd.pool.uuid, hostPath, config.PrivateIpAddress);
-                        }
-                        else
-                        {
-                            logger.Info("Deleting HeartBeat Task from task scheduler for pool " + (string)cmd.pool.uuid);
-                            Utils.RemoveHeartBeatTask(cmd.pool.uuid);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        logger.Error("Error occurred in adding/delete HeartBeat Task to/from Task Scheduler : " + e.Message);
-                    }
+                    AddOrRemoveHeartbeatTask(cmd, hostPath);
                 }
 
                 return ReturnCloudStackTypedJArray(ansContent, CloudStackTypes.ModifyStoragePoolAnswer);
+            }
+        }
+
+        private static void AddOrRemoveHeartbeatTask(dynamic cmd, string hostPath)
+        {
+            try
+            {
+                if ((bool)cmd.add)
+                {
+                    logger.Info("Adding HeartBeat Task to task scheduler for pool " + (string)cmd.pool.uuid);
+                    Utils.AddHeartBeatTask((string)cmd.pool.uuid, hostPath, config.PrivateIpAddress);
+                }
+                else
+                {
+                    logger.Info("Deleting HeartBeat Task from task scheduler for pool " + (string)cmd.pool.uuid);
+                    Utils.RemoveHeartBeatTask(cmd.pool.uuid);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Error("Error occurred in adding/delete HeartBeat Task to/from Task Scheduler : " + e.Message);
+            }
+        }
+
+        private static void AddOrRemoveCsv(dynamic cmd, ref string details, ref long capacityBytes, ref long availableBytes, ref string hostPath, ref bool result)
+        {
+            if ((bool)cmd.add)
+            {
+                hostPath = config.getPrimaryStorage((string)cmd.pool.uuid);
+                if (hostPath == null)
+                {
+                    logger.Info("Adding cluster shared volume");
+                    try
+                    {
+                        try
+                        {
+                            hostPath = wmiCallsV2.FindClusterSharedVolume((string)cmd.pool.path);
+                        }
+                        catch (Exception e)
+                        {
+                            logger.Error("Disk is not already added to CSV " + e.Message);
+                        }
+                        config.setPrimaryStorage((string)cmd.pool.uuid, hostPath);
+                    }
+                    catch (Exception e)
+                    {
+                        result = false;
+                        details = e.Message;
+                    }
+                }
+
+                if (hostPath != null)
+                {
+                    Utils.GetShareDetails(hostPath, out capacityBytes, out availableBytes);
+                }
+            }
+            else
+            {
+                config.removePrimaryStorage((string)cmd.pool.uuid);
+            }
+        }
+
+        private static void AddOrRemoveSmb(dynamic cmd, ref long capacityBytes, ref long availableBytes, ref string hostPath)
+        {
+            if ((bool)cmd.add)
+            {
+                NFSTO share = new NFSTO();
+                String uriStr = "cifs://" + (string)cmd.pool.host + (string)cmd.pool.path;
+                share.uri = new Uri(uriStr);
+                hostPath = Utils.NormalizePath(share.UncPath);
+
+                // Check access to share.
+                Utils.GetShareDetails(hostPath, out capacityBytes, out availableBytes);
+                config.setPrimaryStorage((string)cmd.pool.uuid, hostPath);
+            }
+            else
+            {
+                config.removePrimaryStorage((string)cmd.pool.uuid);
             }
         }
 
