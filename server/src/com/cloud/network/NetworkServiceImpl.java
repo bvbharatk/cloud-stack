@@ -16,6 +16,49 @@
 // under the License.
 package com.cloud.network;
 
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.UnknownHostException;
+import java.security.InvalidParameterException;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
+
+import javax.ejb.Local;
+import javax.inject.Inject;
+import javax.naming.ConfigurationException;
+
+import org.apache.cloudstack.acl.ControlledEntity.ACLType;
+import org.apache.cloudstack.acl.SecurityChecker.AccessType;
+import org.apache.cloudstack.api.ApiConstants;
+import org.apache.cloudstack.api.command.admin.network.CreateNetworkCmdByAdmin;
+import org.apache.cloudstack.api.command.admin.network.DedicateGuestVlanRangeCmd;
+import org.apache.cloudstack.api.command.admin.network.ListDedicatedGuestVlanRangesCmd;
+import org.apache.cloudstack.api.command.admin.usage.ListTrafficTypeImplementorsCmd;
+import org.apache.cloudstack.api.command.user.network.CreateNetworkCmd;
+import org.apache.cloudstack.api.command.user.network.ListNetworksCmd;
+import org.apache.cloudstack.api.command.user.network.RestartNetworkCmd;
+import org.apache.cloudstack.api.command.user.vm.ListNicsCmd;
+import org.apache.cloudstack.context.CallContext;
+import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
+import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
+import org.apache.cloudstack.framework.messagebus.MessageBus;
+import org.apache.cloudstack.framework.messagebus.PublishScope;
+import org.apache.cloudstack.network.element.InternalLoadBalancerElementService;
+import org.apache.log4j.Logger;
+
 import com.cloud.api.ApiDBUtils;
 import com.cloud.configuration.Config;
 import com.cloud.configuration.ConfigurationManager;
@@ -66,6 +109,8 @@ import com.cloud.network.dao.IPAddressDao;
 import com.cloud.network.dao.IPAddressVO;
 import com.cloud.network.dao.LoadBalancerVMMapDao;
 import com.cloud.network.dao.NetworkDao;
+import com.cloud.network.dao.NetworkDetailVO;
+import com.cloud.network.dao.NetworkDetailsDao;
 import com.cloud.network.dao.NetworkDomainDao;
 import com.cloud.network.dao.NetworkDomainVO;
 import com.cloud.network.dao.NetworkServiceMapDao;
@@ -83,6 +128,7 @@ import com.cloud.network.element.VirtualRouterElement;
 import com.cloud.network.element.VpcVirtualRouterElement;
 import com.cloud.network.guru.NetworkGuru;
 import com.cloud.network.lb.LoadBalancingRulesService;
+import com.cloud.network.router.VirtualRouter;
 import com.cloud.network.rules.FirewallRule.Purpose;
 import com.cloud.network.rules.FirewallRuleVO;
 import com.cloud.network.rules.RulesManager;
@@ -136,6 +182,7 @@ import com.cloud.utils.db.TransactionStatus;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.exception.ExceptionUtil;
 import com.cloud.utils.net.NetUtils;
+import com.cloud.vm.DomainRouterVO;
 import com.cloud.vm.Nic;
 import com.cloud.vm.NicSecondaryIp;
 import com.cloud.vm.NicVO;
@@ -145,54 +192,12 @@ import com.cloud.vm.SecondaryStorageVmVO;
 import com.cloud.vm.UserVmVO;
 import com.cloud.vm.VMInstanceVO;
 import com.cloud.vm.VirtualMachine;
+import com.cloud.vm.dao.DomainRouterDao;
 import com.cloud.vm.dao.NicDao;
 import com.cloud.vm.dao.NicSecondaryIpDao;
 import com.cloud.vm.dao.NicSecondaryIpVO;
 import com.cloud.vm.dao.UserVmDao;
 import com.cloud.vm.dao.VMInstanceDao;
-
-import org.apache.cloudstack.acl.ControlledEntity.ACLType;
-import org.apache.cloudstack.acl.SecurityChecker.AccessType;
-import org.apache.cloudstack.api.ApiConstants;
-import org.apache.cloudstack.api.command.admin.network.CreateNetworkCmdByAdmin;
-import org.apache.cloudstack.api.command.admin.network.DedicateGuestVlanRangeCmd;
-import org.apache.cloudstack.api.command.admin.network.ListDedicatedGuestVlanRangesCmd;
-import org.apache.cloudstack.api.command.admin.usage.ListTrafficTypeImplementorsCmd;
-import org.apache.cloudstack.api.command.user.network.CreateNetworkCmd;
-import org.apache.cloudstack.api.command.user.network.ListNetworksCmd;
-import org.apache.cloudstack.api.command.user.network.RestartNetworkCmd;
-import org.apache.cloudstack.api.command.user.vm.ListNicsCmd;
-import org.apache.cloudstack.context.CallContext;
-import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
-import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
-import org.apache.cloudstack.framework.messagebus.MessageBus;
-import org.apache.cloudstack.framework.messagebus.PublishScope;
-import org.apache.cloudstack.network.element.InternalLoadBalancerElementService;
-import org.apache.log4j.Logger;
-
-import javax.ejb.Local;
-import javax.inject.Inject;
-import javax.naming.ConfigurationException;
-
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.URI;
-import java.net.UnknownHostException;
-import java.security.InvalidParameterException;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
 
 /**
  * NetworkServiceImpl implements NetworkService.
@@ -325,6 +330,12 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
 
     @Inject
     MessageBus _messageBus;
+
+    @Inject
+    DomainRouterDao _routerDao;
+
+    @Inject
+    NetworkDetailsDao _networkDetailsDao;
 
     int _cidrLimit;
     boolean _allowSubdomainNetworkAccess;
@@ -2185,11 +2196,11 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
                 s_logger.info("The specified guest vm cidr has " +  range + " IPs");
 
                 for (NicVO nic : nicsPresent) {
-                    long nicIp = NetUtils.ip2Long(nic.getIp4Address());
+                    long nicIp = NetUtils.ip2Long(nic.getIPv4Address());
                     //check if nic IP is outside the guest vm cidr
                     if (nicIp < startIp || nicIp > endIp) {
                     if (!(nic.getState() == Nic.State.Deallocating)) {
-                            throw new InvalidParameterValueException("Active IPs like " + nic.getIp4Address() + " exist outside the Guest VM CIDR. Cannot apply reservation ");
+                            throw new InvalidParameterValueException("Active IPs like " + nic.getIPv4Address() + " exist outside the Guest VM CIDR. Cannot apply reservation ");
                             }
                         }
                     }
@@ -2231,131 +2242,168 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
         ReservationContext context = new ReservationContextImpl(null, null, callerUser, callerAccount);
         // 1) Shutdown all the elements and cleanup all the rules. Don't allow to shutdown network in intermediate
         // states - Shutdown and Implementing
-        boolean validStateToShutdown = (network.getState() == Network.State.Implemented || network.getState() == Network.State.Setup || network.getState() == Network.State.Allocated);
-        if (restartNetwork) {
-            if (validStateToShutdown) {
-                if (!changeCidr) {
-                    s_logger.debug("Shutting down elements and resources for network id=" + networkId + " as a part of network update");
+        boolean updateInsequence=false;
+        List<DomainRouterVO> routers=null;
+        if(_networkOfferingDao.findById(network.getNetworkOfferingId()).getRedundantRouter() && _networkOfferingDao.findById(networkOfferingId).getRedundantRouter() && network.getVpcId()==null) {
+            updateInsequence=_networkMgr.canUpdateInSequence(network);
+            if(updateInsequence){
+                _networkMgr.configureUpdateInSequence(network);
+                NetworkDetailVO networkDetail =new NetworkDetailVO(network.getId(),Network.updatingInSequence,"true",true);
+                _networkDetailsDao.persist(networkDetail);
+            }
+        }
 
-                    if (!_networkMgr.shutdownNetworkElementsAndResources(context, true, network)) {
-                        s_logger.warn("Failed to shutdown the network elements and resources as a part of network restart: " + network);
-                        CloudRuntimeException ex = new CloudRuntimeException("Failed to shutdown the network elements and resources as a part of update to network of specified id");
+        boolean validStateToShutdown = (network.getState() == Network.State.Implemented || network.getState() == Network.State.Setup || network.getState() == Network.State.Allocated);
+        //think about faliure cases, the network needs to be returned to some consistent state in case of failure.
+        try {
+            do {
+                if (restartNetwork) {
+                    if (validStateToShutdown) {
+                        if (!changeCidr) {
+                            s_logger.debug("Shutting down elements and resources for network id=" + networkId + " as a part of network update");
+
+                            if (!_networkMgr.shutdownNetworkElementsAndResources(context, true, network)) {
+                                s_logger.warn("Failed to shutdown the network elements and resources as a part of network restart: " + network);
+                                CloudRuntimeException ex = new CloudRuntimeException("Failed to shutdown the network elements and resources as a part of update to network of specified id");
+                                ex.addProxyObject(network.getUuid(), "networkId");
+                                throw ex;
+                            }
+                        } else {
+                            // We need to shutdown the network, since we want to re-implement the network.
+                            s_logger.debug("Shutting down network id=" + networkId + " as a part of network update");
+
+                            //check if network has reservation
+                            if (NetUtils.isNetworkAWithinNetworkB(network.getCidr(), network.getNetworkCidr())) {
+                                s_logger.warn("Existing IP reservation will become ineffective for the network with id =  " + networkId
+                                        + " You need to reapply reservation after network reimplementation.");
+                                //set cidr to the newtork cidr
+                                network.setCidr(network.getNetworkCidr());
+                                //set networkCidr to null to bring network back to no IP reservation state
+                                network.setNetworkCidr(null);
+                            }
+
+                            if (!_networkMgr.shutdownNetwork(network.getId(), context, true)) {
+                                s_logger.warn("Failed to shutdown the network as a part of update to network with specified id");
+                                CloudRuntimeException ex = new CloudRuntimeException("Failed to shutdown the network as a part of update of specified network id");
+                                ex.addProxyObject(network.getUuid(), "networkId");
+                                throw ex;
+                            }
+                        }
+                    } else {
+                        CloudRuntimeException ex = new CloudRuntimeException(
+                                "Failed to shutdown the network elements and resources as a part of update to network with specified id; network is in wrong state: " + network.getState());
                         ex.addProxyObject(network.getUuid(), "networkId");
                         throw ex;
+                    }
+                }
+
+                // 2) Only after all the elements and rules are shutdown properly, update the network VO
+                // get updated network
+                Network.State networkState = _networksDao.findById(networkId).getState();
+                boolean validStateToImplement = (networkState == Network.State.Implemented || networkState == Network.State.Setup || networkState == Network.State.Allocated);
+                if (restartNetwork && !validStateToImplement) {
+                    CloudRuntimeException ex = new CloudRuntimeException(
+                            "Failed to implement the network elements and resources as a part of update to network with specified id; network is in wrong state: " + networkState);
+                    ex.addProxyObject(network.getUuid(), "networkId");
+                    throw ex;
+                }
+
+                if (networkOfferingId != null) {
+                    if (networkOfferingChanged) {
+                        Transaction.execute(new TransactionCallbackNoReturn() {
+                            @Override
+                            public void doInTransactionWithoutResult(TransactionStatus status) {
+                                network.setNetworkOfferingId(networkOfferingId);
+                                _networksDao.update(networkId, network, newSvcProviders);
+                                // get all nics using this network
+                                // log remove usage events for old offering
+                                // log assign usage events for new offering
+                                List<NicVO> nics = _nicDao.listByNetworkId(networkId);
+                                for (NicVO nic : nics) {
+                                    long vmId = nic.getInstanceId();
+                                    VMInstanceVO vm = _vmDao.findById(vmId);
+                                    if (vm == null) {
+                                        s_logger.error("Vm for nic " + nic.getId() + " not found with Vm Id:" + vmId);
+                                        continue;
+                                    }
+                                    long isDefault = (nic.isDefaultNic()) ? 1 : 0;
+                                    String nicIdString = Long.toString(nic.getId());
+                                    UsageEventUtils.publishUsageEvent(EventTypes.EVENT_NETWORK_OFFERING_REMOVE, vm.getAccountId(), vm.getDataCenterId(), vm.getId(), nicIdString,
+                                            oldNetworkOfferingId, null, isDefault, VirtualMachine.class.getName(), vm.getUuid(), vm.isDisplay());
+                                    UsageEventUtils.publishUsageEvent(EventTypes.EVENT_NETWORK_OFFERING_ASSIGN, vm.getAccountId(), vm.getDataCenterId(), vm.getId(), nicIdString,
+                                            networkOfferingId, null, isDefault, VirtualMachine.class.getName(), vm.getUuid(), vm.isDisplay());
+                                }
+                            }
+                        });
+                    } else {
+                        network.setNetworkOfferingId(networkOfferingId);
+                        _networksDao.update(networkId, network,
+                                _networkMgr.finalizeServicesAndProvidersForNetwork(_entityMgr.findById(NetworkOffering.class, networkOfferingId), network.getPhysicalNetworkId()));
                     }
                 } else {
-                    // We need to shutdown the network, since we want to re-implement the network.
-                    s_logger.debug("Shutting down network id=" + networkId + " as a part of network update");
+                    _networksDao.update(networkId, network);
+                }
 
-                    //check if network has reservation
-                    if (NetUtils.isNetworkAWithinNetworkB(network.getCidr(), network.getNetworkCidr())) {
-                        s_logger.warn("Existing IP reservation will become ineffective for the network with id =  " + networkId
-                                + " You need to reapply reservation after network reimplementation.");
-                        //set cidr to the newtork cidr
-                        network.setCidr(network.getNetworkCidr());
-                        //set networkCidr to null to bring network back to no IP reservation state
-                        network.setNetworkCidr(null);
-                    }
-
-                    if (!_networkMgr.shutdownNetwork(network.getId(), context, true)) {
-                        s_logger.warn("Failed to shutdown the network as a part of update to network with specified id");
-                        CloudRuntimeException ex = new CloudRuntimeException("Failed to shutdown the network as a part of update of specified network id");
-                        ex.addProxyObject(network.getUuid(), "networkId");
-                        throw ex;
+                // 3) Implement the elements and rules again
+                if (restartNetwork) {
+                    if (network.getState() != Network.State.Allocated) {
+                        DeployDestination dest = new DeployDestination(_dcDao.findById(network.getDataCenterId()), null, null, null);
+                        s_logger.debug("Implementing the network " + network + " elements and resources as a part of network update");
+                        try {
+                            if (!changeCidr) {
+                                _networkMgr.implementNetworkElementsAndResources(dest, context, network, _networkOfferingDao.findById(network.getNetworkOfferingId()));
+                            } else {
+                                _networkMgr.implementNetwork(network.getId(), dest, context);
+                            }
+                        } catch (Exception ex) {
+                            s_logger.warn("Failed to implement network " + network + " elements and resources as a part of network update due to ", ex);
+                            CloudRuntimeException e = new CloudRuntimeException("Failed to implement network (with specified id) elements and resources as a part of network update");
+                            e.addProxyObject(network.getUuid(), "networkId");
+                            throw e;
+                        }
                     }
                 }
-            } else {
-                CloudRuntimeException ex = new CloudRuntimeException(
-                        "Failed to shutdown the network elements and resources as a part of update to network with specified id; network is in wrong state: " + network.getState());
-                ex.addProxyObject(network.getUuid(), "networkId");
-                throw ex;
-            }
-        }
 
-        // 2) Only after all the elements and rules are shutdown properly, update the network VO
-        // get updated network
-        Network.State networkState = _networksDao.findById(networkId).getState();
-        boolean validStateToImplement = (networkState == Network.State.Implemented || networkState == Network.State.Setup || networkState == Network.State.Allocated);
-        if (restartNetwork && !validStateToImplement) {
-            CloudRuntimeException ex = new CloudRuntimeException(
-                    "Failed to implement the network elements and resources as a part of update to network with specified id; network is in wrong state: " + networkState);
-            ex.addProxyObject(network.getUuid(), "networkId");
-            throw ex;
-        }
-
-        if (networkOfferingId != null) {
-            if (networkOfferingChanged) {
-                Transaction.execute(new TransactionCallbackNoReturn() {
-                    @Override
-                    public void doInTransactionWithoutResult(TransactionStatus status) {
-                network.setNetworkOfferingId(networkOfferingId);
-                _networksDao.update(networkId, network, newSvcProviders);
-                // get all nics using this network
-                // log remove usage events for old offering
-                // log assign usage events for new offering
-                List<NicVO> nics = _nicDao.listByNetworkId(networkId);
-                for (NicVO nic : nics) {
-                    long vmId = nic.getInstanceId();
-                    VMInstanceVO vm = _vmDao.findById(vmId);
-                    if (vm == null) {
-                        s_logger.error("Vm for nic " + nic.getId() + " not found with Vm Id:" + vmId);
-                        continue;
+                // 4) if network has been upgraded from a non persistent ntwk offering to a persistent ntwk offering,
+                // implement the network if its not already
+                if (networkOfferingChanged && !oldNtwkOff.getIsPersistent() && networkOffering.getIsPersistent()) {
+                    if (network.getState() == Network.State.Allocated) {
+                        try {
+                            DeployDestination dest = new DeployDestination(_dcDao.findById(network.getDataCenterId()), null, null, null);
+                            _networkMgr.implementNetwork(network.getId(), dest, context);
+                        } catch (Exception ex) {
+                            s_logger.warn("Failed to implement network " + network + " elements and resources as a part o" + "f network update due to ", ex);
+                            CloudRuntimeException e = new CloudRuntimeException("Failed to implement network (with specified" + " id) elements and resources as a part of network update");
+                            e.addProxyObject(network.getUuid(), "networkId");
+                            throw e;
+                        }
                     }
-                    long isDefault = (nic.isDefaultNic()) ? 1 : 0;
-                    String nicIdString = Long.toString(nic.getId());
-                            UsageEventUtils.publishUsageEvent(EventTypes.EVENT_NETWORK_OFFERING_REMOVE, vm.getAccountId(), vm.getDataCenterId(), vm.getId(), nicIdString,
-                                    oldNetworkOfferingId, null, isDefault, VirtualMachine.class.getName(), vm.getUuid(), vm.isDisplay());
-                            UsageEventUtils.publishUsageEvent(EventTypes.EVENT_NETWORK_OFFERING_ASSIGN, vm.getAccountId(), vm.getDataCenterId(), vm.getId(), nicIdString,
-                                    networkOfferingId, null, isDefault, VirtualMachine.class.getName(), vm.getUuid(), vm.isDisplay());
                 }
-                    }
-                });
-            }   else {
-                network.setNetworkOfferingId(networkOfferingId);
-                _networksDao.update(networkId, network,
-                        _networkMgr.finalizeServicesAndProvidersForNetwork(_entityMgr.findById(NetworkOffering.class, networkOfferingId), network.getPhysicalNetworkId()));
-            }
-        }   else {
-            _networksDao.update(networkId, network);
-        }
-
-        // 3) Implement the elements and rules again
-        if (restartNetwork) {
-            if (network.getState() != Network.State.Allocated) {
-                DeployDestination dest = new DeployDestination(_dcDao.findById(network.getDataCenterId()), null, null, null);
-                s_logger.debug("Implementing the network " + network + " elements and resources as a part of network update");
-                try {
-                    if (!changeCidr) {
-                        _networkMgr.implementNetworkElementsAndResources(dest, context, network, _networkOfferingDao.findById(network.getNetworkOfferingId()));
-                    } else {
-                        _networkMgr.implementNetwork(network.getId(), dest, context);
-                    }
-                } catch (Exception ex) {
-                    s_logger.warn("Failed to implement network " + network + " elements and resources as a part of network update due to ", ex);
-                    CloudRuntimeException e = new CloudRuntimeException("Failed to implement network (with specified id) elements and resources as a part of network update");
-                    e.addProxyObject(network.getUuid(), "networkId");
-                    throw e;
+            } while(updateInsequence && !_networkMgr.isUpdateComplete(network));
+        }catch (Exception exception){
+             throw new CloudRuntimeException("failed to update network "+network.getUuid()+"due to "+exception.getMessage());
+        }finally {
+            if(updateInsequence){
+                if( _networkDetailsDao.findDetail(networkId,Network.updatingInSequence)!=null){
+                    _networkDetailsDao.removeDetail(networkId,Network.updatingInSequence);
                 }
             }
         }
-
-        // 4) if network has been upgraded from a non persistent ntwk offering to a persistent ntwk offering,
-        // implement the network if its not already
-        if (networkOfferingChanged && !oldNtwkOff.getIsPersistent() && networkOffering.getIsPersistent()) {
-            if (network.getState() == Network.State.Allocated) {
-                try {
-                    DeployDestination dest = new DeployDestination(_dcDao.findById(network.getDataCenterId()), null, null, null);
-                    _networkMgr.implementNetwork(network.getId(), dest, context);
-                } catch (Exception ex) {
-                    s_logger.warn("Failed to implement network " + network + " elements and resources as a part o" + "f network update due to ", ex);
-                    CloudRuntimeException e = new CloudRuntimeException("Failed to implement network (with specified" + " id) elements and resources as a part of network update");
-                    e.addProxyObject(network.getUuid(), "networkId");
-                    throw e;
-                }
-            }
-        }
-
         return getNetwork(network.getId());
+    }
+
+    private List<DomainRouterVO> getRoutersNeedingUpdate(NetworkVO network, List<DomainRouterVO> routers) {
+        routers=_routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
+        for(int i=0; i< routers.size(); i++){
+            DomainRouterVO router=routers.get(i);
+            if(router.getUpdateState()== VirtualRouter.UpdateState.UPDATE_COMPLETE) routers.remove(router);
+            else if(router.getUpdateState()== VirtualRouter.UpdateState.UPDATE_IN_PROGRESS) {
+                router.setUpdateState(VirtualRouter.UpdateState.UPDATE_COMPLETE);
+                _routerDao.persist(router);
+                routers.remove(router);
+            }
+        }
+        return routers;
     }
 
     protected Set<Long> getAvailableIps(Network network, String requestedIp) {

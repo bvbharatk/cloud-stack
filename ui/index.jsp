@@ -40,6 +40,7 @@
         <!--[if IE 7]>
             <link type="text/css" rel="stylesheet" href="css/cloudstack3-ie7.css" />
             <![endif]-->
+	<link type="text/css" rel="stylesheet" href="css/custom.css" />
     </head>
     <body>
         <!-- CloudStack widget content -->
@@ -569,7 +570,7 @@
                                     <!-- SSH Key Pairs -->
                                     <div class="select">
                                         <div class="name">
-                                            <span>SSH Key Pairs</span>
+                                            <span><fmt:message key="label.ssh.key.pairs"/></span>
                                         </div>
                                         <div class="value">
                                             <span wizard-field="sshkey-pairs"></span>

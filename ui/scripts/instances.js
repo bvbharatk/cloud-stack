@@ -602,7 +602,7 @@
                             },
                             complete: function(args) {
                                 if (args.password != null && args.password.length > 0)
-                                    return 'Password has been reset to ' + args.password;
+                                    return _l('message.password.has.been.reset.to') + ' ' + args.password;
                                 else
                                     return null;
                             }
@@ -618,11 +618,9 @@
                         createForm: {
                             title: 'label.action.destroy.instance',
                             desc: 'label.action.destroy.instance',
-                isWarning: true,
+                            isWarning: true,
                             preFilter: function(args) {
-                                if (isAdmin() || isDomainAdmin()) {
-                                    args.$form.find('.form-item[rel=expunge]').css('display', 'inline-block');
-                                } else {
+                                if (! g_allowUserExpungeRecoverVm) {
                                     args.$form.find('.form-item[rel=expunge]').hide();
                                 }
                             },
@@ -1155,10 +1153,10 @@
                                 return 'message.action.instance.reset.password';
                             },
                             notification: function(args) {
-                                return 'label.action.reset.password';
+                                return _l('label.action.reset.password');
                             },
                             complete: function(args) {
-                                return 'Password has been reset to ' + args.password;
+                                return _l('message.password.has.been.reset.to') + ' ' + args.password;
                             }
                         },
 
@@ -1642,13 +1640,13 @@
                     },
 
                     resetSSHKeyForVirtualMachine: {
-                        label: 'Reset SSH Key Pair',
+                        label: 'label.reset.ssh.key.pair',
                         createForm: {
-                            title: 'Reset SSH Key Pair on VM',
-                            desc: 'Please specify a ssh key pair that you would like to add to this VM. Please note the root password will be changed by this operation if password is enabled.',
+                            title: 'label.reset.ssh.key.pair.on.vm',
+                            desc: 'message.desc.reset.ssh.key.pair',
                             fields: {
                                 sshkeypair: {
-                                    label: 'New SSH Key Pair',
+                                    label: 'label.new.ssh.key.pair',
                                     validation: {
                                         required: true
                                     },
@@ -1718,11 +1716,11 @@
                         },
                         messages: {
                             notification: function(args) {
-                                return 'Reset SSH Key Pair on VM';
+                                return _l('label.reset.ssh.key.pair.on.vm');
                             },
                             complete: function(args) {
                                 if (args.password != null) {
-                                    return 'Password of the VM has been reset to ' + args.password;
+                                    return _l('message.password.of.the.vm.has.been.reset.to') + ' ' + args.password;
                                 }
 
                                 return false;
@@ -2002,7 +2000,7 @@
                                 label: 'label.public.ip'
                             },
                             keypair: {
-                                label: 'SSH Key Pair'
+                                label: 'label.ssh.key.pair'
                             },
                             domain: {
                                 label: 'label.domain'
@@ -2425,11 +2423,13 @@
         var allowedActions = [];
 
         if (jsonObj.state == 'Destroyed') {
-            if (isAdmin() || isDomainAdmin()) {
+            if (g_allowUserExpungeRecoverVm) {
                 allowedActions.push("recover");
             }
-            if (isAdmin() || isDomainAdmin())
+
+            if (g_allowUserExpungeRecoverVm) {
                 allowedActions.push("expunge");
+            }
         } else if (jsonObj.state == 'Running') {
             allowedActions.push("stop");
             allowedActions.push("restart");
@@ -2498,8 +2498,9 @@
         } else if (jsonObj.state == 'Error') {
             allowedActions.push("destroy");
         } else if (jsonObj.state == 'Expunging') {
-            if (isAdmin() || isDomainAdmin())
+            if (g_allowUserExpungeRecoverVm) {
                 allowedActions.push("expunge");
+            }
         }
         return allowedActions;
     }

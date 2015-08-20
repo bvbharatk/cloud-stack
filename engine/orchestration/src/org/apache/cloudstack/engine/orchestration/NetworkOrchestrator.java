@@ -39,6 +39,8 @@ import javax.naming.ConfigurationException;
 
 import com.cloud.network.Networks;
 
+import com.cloud.network.dao.NetworkDetailsDao;
+import com.cloud.vm.dao.DomainRouterDao;
 import org.apache.log4j.Logger;
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
 import org.apache.cloudstack.context.CallContext;
@@ -47,8 +49,8 @@ import org.apache.cloudstack.engine.cloud.entity.api.db.dao.VMNetworkMapDao;
 import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;
 import org.apache.cloudstack.framework.config.ConfigDepot;
 import org.apache.cloudstack.framework.config.ConfigKey;
-import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.cloudstack.framework.config.ConfigKey.Scope;
+import org.apache.cloudstack.framework.config.Configurable;
 import org.apache.cloudstack.framework.config.dao.ConfigurationDao;
 import org.apache.cloudstack.framework.messagebus.MessageBus;
 import org.apache.cloudstack.framework.messagebus.PublishScope;
@@ -208,6 +210,7 @@ import com.cloud.vm.dao.NicSecondaryIpDao;
 import com.cloud.vm.dao.NicSecondaryIpVO;
 import com.cloud.vm.dao.UserVmDao;
 import com.cloud.vm.dao.VMInstanceDao;
+import com.cloud.network.element.UpdateResourcesInSequence;
 
 /**
  * NetworkManagerImpl implements NetworkManager.
@@ -266,8 +269,11 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     MessageBus _messageBus;
     @Inject
     VMNetworkMapDao _vmNetworkMapDao;
+    @Inject
+    DomainRouterDao _rotuerDao;
 
     List<NetworkGuru> networkGurus;
+
 
     public List<NetworkGuru> getNetworkGurus() {
         return networkGurus;
@@ -351,6 +357,8 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     PortableIpDao _portableIpDao;
     @Inject
     ConfigDepot _configDepot;
+    @Inject
+    NetworkDetailsDao _networkDetailsDao;
 
     protected StateMachine2<Network.State, Network.Event, Network> _stateMachine;
     ScheduledExecutorService _executor;
@@ -839,7 +847,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
 
         vo.setDefaultNic(profile.isDefaultNic());
 
-        vo.setIp4Address(profile.getIp4Address());
+        vo.setIp4Address(profile.getIPv4Address());
         vo.setAddressFormat(profile.getFormat());
 
         if (profile.getMacAddress() != null) {
@@ -847,8 +855,8 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         }
 
         vo.setMode(profile.getMode());
-        vo.setNetmask(profile.getNetmask());
-        vo.setGateway(profile.getGateway());
+        vo.setNetmask(profile.getIPv4Netmask());
+        vo.setGateway(profile.getIPv4Gateway());
 
         if (profile.getBroadCastUri() != null) {
             vo.setBroadcastUri(profile.getBroadCastUri());
@@ -860,25 +868,25 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
 
         vo.setState(Nic.State.Allocated);
 
-        vo.setIp6Address(profile.getIp6Address());
-        vo.setIp6Gateway(profile.getIp6Gateway());
-        vo.setIp6Cidr(profile.getIp6Cidr());
+        vo.setIp6Address(profile.getIPv6Address());
+        vo.setIp6Gateway(profile.getIPv6Gateway());
+        vo.setIp6Cidr(profile.getIPv6Cidr());
 
         return deviceId;
     }
 
     protected void applyProfileToNicForRelease(NicVO vo, NicProfile profile) {
-        vo.setGateway(profile.getGateway());
+        vo.setGateway(profile.getIPv4Gateway());
         vo.setAddressFormat(profile.getFormat());
-        vo.setIp4Address(profile.getIp4Address());
-        vo.setIp6Address(profile.getIp6Address());
+        vo.setIp4Address(profile.getIPv4Address());
+        vo.setIp6Address(profile.getIPv6Address());
         vo.setMacAddress(profile.getMacAddress());
         if (profile.getReservationStrategy() != null) {
             vo.setReservationStrategy(profile.getReservationStrategy());
         }
         vo.setBroadcastUri(profile.getBroadCastUri());
         vo.setIsolationUri(profile.getIsolationUri());
-        vo.setNetmask(profile.getNetmask());
+        vo.setNetmask(profile.getIPv4Netmask());
     }
 
     protected void applyProfileToNetwork(NetworkVO network, NetworkProfile profile) {
@@ -893,13 +901,13 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         to.setDeviceId(nic.getDeviceId());
         to.setBroadcastType(config.getBroadcastDomainType());
         to.setType(config.getTrafficType());
-        to.setIp(nic.getIp4Address());
-        to.setNetmask(nic.getNetmask());
+        to.setIp(nic.getIPv4Address());
+        to.setNetmask(nic.getIPv4Netmask());
         to.setMac(nic.getMacAddress());
-        to.setDns1(profile.getDns1());
-        to.setDns2(profile.getDns2());
-        if (nic.getGateway() != null) {
-            to.setGateway(nic.getGateway());
+        to.setDns1(profile.getIPv4Dns1());
+        to.setDns2(profile.getIPv4Dns2());
+        if (nic.getIPv4Gateway() != null) {
+            to.setGateway(nic.getIPv4Gateway());
         } else {
             to.setGateway(config.getGateway());
         }
@@ -910,8 +918,8 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         to.setBroadcastUri(nic.getBroadcastUri());
         to.setIsolationuri(nic.getIsolationUri());
         if (profile != null) {
-            to.setDns1(profile.getDns1());
-            to.setDns2(profile.getDns2());
+            to.setDns1(profile.getIPv4Dns1());
+            to.setDns2(profile.getIPv4Dns2());
         }
 
         Integer networkRate = _networkModel.getNetworkRate(config.getId(), null);
@@ -1240,7 +1248,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
                 DhcpServiceProvider sp = (DhcpServiceProvider)element;
                 Map<Capability, String> dhcpCapabilities = element.getCapabilities().get(Service.Dhcp);
                 String supportsMultipleSubnets = dhcpCapabilities.get(Capability.DhcpAccrossMultipleSubnets);
-                if ((supportsMultipleSubnets != null && Boolean.valueOf(supportsMultipleSubnets)) && profile.getIp6Address() == null) {
+                if ((supportsMultipleSubnets != null && Boolean.valueOf(supportsMultipleSubnets)) && profile.getIPv6Address() == null) {
                     if (!sp.configDhcpSupportForSubnet(network, profile, vmProfile, dest, context)) {
                         return false;
                     }
@@ -1254,6 +1262,46 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean canUpdateInSequence(Network network){
+        List<Provider> providers = getNetworkProviders(network.getId());
+        for (NetworkElement element : networkElements) {
+            if (providers.contains(element.getProvider())) {
+                if(element instanceof UpdateResourcesInSequence){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void configureUpdateInSequence(Network network) {
+        List<Provider> providers = getNetworkProviders(network.getId());
+        for (NetworkElement element : networkElements) {
+            if (providers.contains(element.getProvider())) {
+                if (element instanceof UpdateResourcesInSequence) {
+                    ((UpdateResourcesInSequence) element).configureResourceUpdateSequence(network);
+                    return;
+                }
+            }
+        }
+        throw  new CloudRuntimeException("The network "+network.getId()+" dose not implement the required provider");
+    }
+
+    @Override
+    public boolean isUpdateComplete(Network network){
+        List<Provider> providers = getNetworkProviders(network.getId());
+        for (NetworkElement element : networkElements) {
+            if (providers.contains(element.getProvider())) {
+                if (element instanceof UpdateResourcesInSequence) {
+                    return ((UpdateResourcesInSequence) element).isUpdateComplete(network);
+                }
+            }
+        }
+        throw  new CloudRuntimeException("The network "+network.getId()+" dose not implement the required provider");
     }
 
     @DB
@@ -1333,19 +1381,19 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
 
                     networkRate, _networkModel.isSecurityGroupSupportedInNetwork(network), _networkModel.getNetworkTag(vmProfile.getHypervisorType(), network));
             guru.reserve(profile, network, vmProfile, dest, context);
-            nic.setIp4Address(profile.getIp4Address());
+            nic.setIp4Address(profile.getIPv4Address());
             nic.setAddressFormat(profile.getFormat());
-            nic.setIp6Address(profile.getIp6Address());
+            nic.setIp6Address(profile.getIPv6Address());
             nic.setMacAddress(profile.getMacAddress());
             nic.setIsolationUri(profile.getIsolationUri());
             nic.setBroadcastUri(profile.getBroadCastUri());
             nic.setReserver(guru.getName());
             nic.setState(Nic.State.Reserved);
-            nic.setNetmask(profile.getNetmask());
-            nic.setGateway(profile.getGateway());
+            nic.setNetmask(profile.getIPv4Netmask());
+            nic.setGateway(profile.getIPv4Gateway());
 
-            if (profile.getStrategy() != null) {
-                nic.setReservationStrategy(profile.getStrategy());
+            if (profile.getReservationStrategy() != null) {
+                nic.setReservationStrategy(profile.getReservationStrategy());
             }
 
             updateNic(nic, network.getId(), 1);
@@ -1478,9 +1526,9 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
                     NetworkGuru guru = AdapterBase.getAdapterByName(networkGurus, network.getGuruName());
                     NicProfile profile = new NicProfile();
                     profile.setDeviceId(255); //dummyId
-                    profile.setIp4Address(userIp.getAddress().toString());
-                    profile.setNetmask(publicIp.getNetmask());
-                    profile.setGateway(publicIp.getGateway());
+                    profile.setIPv4Address(userIp.getAddress().toString());
+                    profile.setIPv4Netmask(publicIp.getNetmask());
+                    profile.setIPv4Gateway(publicIp.getGateway());
                     profile.setMacAddress(publicIp.getMacAddress());
                     profile.setBroadcastType(network.getBroadcastDomainType());
                     profile.setTrafficType(network.getTrafficType());
@@ -1742,7 +1790,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     }
 
     private boolean isLastNicInSubnet(NicVO nic) {
-        if (_nicDao.listByNetworkIdTypeAndGatewayAndBroadcastUri(nic.getNetworkId(), VirtualMachine.Type.User, nic.getGateway(), nic.getBroadcastUri()).size() > 1) {
+        if (_nicDao.listByNetworkIdTypeAndGatewayAndBroadcastUri(nic.getNetworkId(), VirtualMachine.Type.User, nic.getIPv4Gateway(), nic.getBroadcastUri()).size() > 1) {
             return false;
         }
         return true;
@@ -1754,7 +1802,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         Network network = _networksDao.findById(nic.getNetworkId());
         DhcpServiceProvider dhcpServiceProvider = getDhcpServiceProvider(network);
         try {
-            final NicIpAliasVO ipAlias = _nicIpAliasDao.findByGatewayAndNetworkIdAndState(nic.getGateway(), network.getId(), NicIpAlias.state.active);
+            final NicIpAliasVO ipAlias = _nicIpAliasDao.findByGatewayAndNetworkIdAndState(nic.getIPv4Gateway(), network.getId(), NicIpAlias.state.active);
             if (ipAlias != null) {
                 ipAlias.setState(NicIpAlias.state.revoked);
                 Transaction.execute(new TransactionCallbackNoReturn() {
@@ -3116,10 +3164,10 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         NicProfile nic = null;
         if (requested != null && requested.getBroadCastUri() != null) {
             String broadcastUri = requested.getBroadCastUri().toString();
-            String ipAddress = requested.getIp4Address();
+            String ipAddress = requested.getIPv4Address();
             NicVO nicVO = _nicDao.findByNetworkIdInstanceIdAndBroadcastUri(network.getId(), vm.getId(), broadcastUri);
             if (nicVO != null) {
-                if (ipAddress == null || nicVO.getIp4Address().equals(ipAddress)) {
+                if (ipAddress == null || nicVO.getIPv4Address().equals(ipAddress)) {
                     nic = _networkModel.getNicProfile(vm, network.getId(), broadcastUri);
                 }
             }
