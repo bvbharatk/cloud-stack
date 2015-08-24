@@ -239,19 +239,24 @@ public interface Network extends ControlledEntity, StateObject<Network.State>, I
     }
 
     enum Event {
-        ImplementNetwork, DestroyNetwork, OperationSucceeded, OperationFailed;
+        ImplementNetwork, DestroyNetwork, OperationSucceeded, OperationFailed, PartialUpdateComplete, Updating;
     }
 
     public enum State {
 
         Allocated("Indicates the network configuration is in allocated but not setup"), Setup("Indicates the network configuration is setup"), Implementing(
-                "Indicates the network configuration is being implemented"), Implemented("Indicates the network configuration is in use"), Shutdown(
+                "Indicates the network configuration is being implemented"), Implemented("Indicates the network configuration is in use"), UpdatatingRedundantResources("Indicates that the" +
+                "network update for non redundant resources is complete and the update of redundant resource is in progress"),Updating("updating the network"),Shutdown(
                 "Indicates the network configuration is being destroyed"), Destroy("Indicates that the network is destroyed");
 
         protected static final StateMachine2<State, Network.Event, Network> s_fsm = new StateMachine2<State, Network.Event, Network>();
 
         static {
             s_fsm.addTransition(State.Allocated, Event.ImplementNetwork, State.Implementing);
+            s_fsm.addTransition(State.Implemented,Event.Updating,State.Updating);
+            s_fsm.addTransition(State.Updating,Event.PartialUpdateComplete,State.UpdatatingRedundantResources);
+            s_fsm.addTransition(State.Implementing, Event.PartialUpdateComplete, State.UpdatatingRedundantResources);
+            s_fsm.addTransition(State.UpdatatingRedundantResources, Event.OperationSucceeded, State.Implemented);
             s_fsm.addTransition(State.Implementing, Event.OperationSucceeded, State.Implemented);
             s_fsm.addTransition(State.Implementing, Event.OperationFailed, State.Shutdown);
             s_fsm.addTransition(State.Implemented, Event.DestroyNetwork, State.Shutdown);

@@ -27,6 +27,7 @@ import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import com.cloud.network.element.UpdateResourcesInSequence;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
 
@@ -564,6 +565,7 @@ public class FirewallManagerImpl extends ManagerBase implements FirewallService,
     @Override
     public boolean applyRules(Network network, Purpose purpose, List<? extends FirewallRule> rules) throws ResourceUnavailableException {
         boolean handled = false;
+        Network.State networkState = network.getState();
         switch (purpose) {
         /* StaticNatRule would be applied by Firewall provider, since the incompatible of two object */
         case StaticNat:
@@ -574,7 +576,12 @@ public class FirewallManagerImpl extends ManagerBase implements FirewallService,
                 if (!isFwProvider) {
                     continue;
                 }
-                handled = fwElement.applyFWRules(network, rules);
+                if(networkState!=Network.State.UpdatatingRedundantResources || (networkState==Network.State.UpdatatingRedundantResources && fwElement instanceof UpdateResourcesInSequence &&
+                        !((UpdateResourcesInSequence) fwElement).isUpdateComplete(network))){
+                        handled = fwElement.applyFWRules(network, rules);
+                }else
+                    handled=true;
+
                 if (handled)
                     break;
             }
@@ -586,7 +593,12 @@ public class FirewallManagerImpl extends ManagerBase implements FirewallService,
                 if (!isPfProvider) {
                     continue;
                 }
-                    handled = element.applyPFRules(network, (List<PortForwardingRule>)rules);
+                if(networkState!=Network.State.UpdatatingRedundantResources || (networkState==Network.State.UpdatatingRedundantResources && element instanceof UpdateResourcesInSequence &&
+                        !((UpdateResourcesInSequence) element).isUpdateComplete(network))){
+                         handled = element.applyPFRules(network, (List<PortForwardingRule>)rules);
+                }else
+                    handled=true;
+
                 if (handled)
                     break;
             }

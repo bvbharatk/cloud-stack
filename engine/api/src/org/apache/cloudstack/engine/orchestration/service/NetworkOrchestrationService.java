@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.cloud.utils.fsm.NoTransitionException;
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
 import org.apache.cloudstack.framework.config.ConfigKey;
 import org.apache.cloudstack.framework.config.ConfigKey.Scope;
@@ -196,10 +197,10 @@ public interface NetworkOrchestrationService {
     boolean restartNetwork(Long networkId, Account callerAccount, User callerUser, boolean cleanup) throws ConcurrentOperationException, ResourceUnavailableException,
         InsufficientCapacityException;
 
-    boolean shutdownNetworkElementsAndResources(ReservationContext context, boolean b, Network network);
+    boolean shutdownNetworkElementsAndResources(ReservationContext context, boolean b, Network network, boolean onlyRedundant);
 
-    void implementNetworkElementsAndResources(DeployDestination dest, ReservationContext context, Network network, NetworkOffering findById)
-        throws ConcurrentOperationException, InsufficientAddressCapacityException, ResourceUnavailableException, InsufficientCapacityException;
+    void implementNetworkElementsAndResources(DeployDestination dest, ReservationContext context, Network network, NetworkOffering findById, boolean onlyRedundant)
+        throws ConcurrentOperationException, InsufficientAddressCapacityException, ResourceUnavailableException, InsufficientCapacityException, NoTransitionException;
 
     Map<String, String> finalizeServicesAndProvidersForNetwork(NetworkOffering offering, Long physicalNetworkId);
 
@@ -227,7 +228,9 @@ public interface NetworkOrchestrationService {
 
     boolean canUpdateInSequence(Network network);
 
-    void configureUpdateInSequence(Network network);
+    void configureUpdateInSequence(Network network) throws NoTransitionException;
 
     boolean isUpdateComplete(Network network);
+
+    void updateRedundantResources(ReservationContext context, boolean cleanUpNeeded, Network network) throws ResourceUnavailableException, InsufficientAddressCapacityException, InsufficientCapacityException,NoTransitionException;
 }

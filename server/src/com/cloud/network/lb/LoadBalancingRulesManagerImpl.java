@@ -30,6 +30,7 @@ import java.util.Set;
 import javax.ejb.Local;
 import javax.inject.Inject;
 
+import com.cloud.network.element.UpdateResourcesInSequence;
 import org.apache.cloudstack.api.ApiConstants;
 import org.apache.cloudstack.api.command.user.loadbalancer.CreateLBHealthCheckPolicyCmd;
 import org.apache.cloudstack.api.command.user.loadbalancer.CreateLBStickinessPolicyCmd;
@@ -1841,7 +1842,12 @@ public class LoadBalancingRulesManagerImpl<Type> extends ManagerBase implements 
             if (!isLbProvider) {
                 continue;
             }
-            handled = lbElement.applyLBRules(network, rules);
+            if(network.getState()!=Network.State.UpdatatingRedundantResources || (network.getState()==Network.State.UpdatatingRedundantResources && lbElement instanceof UpdateResourcesInSequence &&
+                    !((UpdateResourcesInSequence) lbElement).isUpdateComplete(network))){
+                handled = lbElement.applyLBRules(network, rules);
+            }else
+                handled=true;
+
             if (handled)
                 break;
         }

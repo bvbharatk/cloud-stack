@@ -2247,22 +2247,28 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
         if(_networkOfferingDao.findById(network.getNetworkOfferingId()).getRedundantRouter() && _networkOfferingDao.findById(networkOfferingId).getRedundantRouter() && network.getVpcId()==null) {
             updateInsequence=_networkMgr.canUpdateInSequence(network);
             if(updateInsequence){
-                _networkMgr.configureUpdateInSequence(network);
-                NetworkDetailVO networkDetail =new NetworkDetailVO(network.getId(),Network.updatingInSequence,"true",true);
+                 NetworkDetailVO networkDetail =new NetworkDetailVO(network.getId(),Network.updatingInSequence,"true",true);
                 _networkDetailsDao.persist(networkDetail);
+                try{
+                    _networkMgr.configureUpdateInSequence(network);
+                }catch (Exception ex){
+                    throw new CloudRuntimeException("faild to transist to a new state, network update failed");
+                }
+
+
             }
         }
 
-        boolean validStateToShutdown = (network.getState() == Network.State.Implemented || network.getState() == Network.State.Setup || network.getState() == Network.State.Allocated);
+        boolean validStateToShutdown = (network.getState()==Network.State.Updating ||network.getState() == Network.State.Implemented || network.getState() == Network.State.Setup || network.getState() == Network.State.Allocated);
         //think about faliure cases, the network needs to be returned to some consistent state in case of failure.
         try {
-            do {
+
                 if (restartNetwork) {
                     if (validStateToShutdown) {
                         if (!changeCidr) {
                             s_logger.debug("Shutting down elements and resources for network id=" + networkId + " as a part of network update");
 
-                            if (!_networkMgr.shutdownNetworkElementsAndResources(context, true, network)) {
+                            if (!_networkMgr.shutdownNetworkElementsAndResources(context, true, network, false)) {
                                 s_logger.warn("Failed to shutdown the network elements and resources as a part of network restart: " + network);
                                 CloudRuntimeException ex = new CloudRuntimeException("Failed to shutdown the network elements and resources as a part of update to network of specified id");
                                 ex.addProxyObject(network.getUuid(), "networkId");
@@ -2300,7 +2306,7 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
                 // 2) Only after all the elements and rules are shutdown properly, update the network VO
                 // get updated network
                 Network.State networkState = _networksDao.findById(networkId).getState();
-                boolean validStateToImplement = (networkState == Network.State.Implemented || networkState == Network.State.Setup || networkState == Network.State.Allocated);
+                boolean validStateToImplement = (network.getState()==Network.State.Updating ||networkState == Network.State.Implemented || networkState == Network.State.Setup || networkState == Network.State.Allocated);
                 if (restartNetwork && !validStateToImplement) {
                     CloudRuntimeException ex = new CloudRuntimeException(
                             "Failed to implement the network elements and resources as a part of update to network with specified id; network is in wrong state: " + networkState);
@@ -2351,7 +2357,7 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
                         s_logger.debug("Implementing the network " + network + " elements and resources as a part of network update");
                         try {
                             if (!changeCidr) {
-                                _networkMgr.implementNetworkElementsAndResources(dest, context, network, _networkOfferingDao.findById(network.getNetworkOfferingId()));
+                                _networkMgr.implementNetworkElementsAndResources(dest, context, network, _networkOfferingDao.findById(network.getNetworkOfferingId()), false);
                             } else {
                                 _networkMgr.implementNetwork(network.getId(), dest, context);
                             }
@@ -2379,7 +2385,10 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
                         }
                     }
                 }
-            } while(updateInsequence && !_networkMgr.isUpdateComplete(network));
+            if(updateInsequence && restartNetwork){
+                s_logger.debug("updating the elements which support redundancy");
+                _networkMgr.updateRedundantResources(context,true ,network);
+            }
         }catch (Exception exception){
              throw new CloudRuntimeException("failed to update network "+network.getUuid()+"due to "+exception.getMessage());
         }finally {

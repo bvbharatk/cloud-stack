@@ -29,6 +29,7 @@ import java.util.UUID;
 
 import javax.inject.Inject;
 
+import com.cloud.network.element.UpdateResourcesInSequence;
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
 import org.apache.cloudstack.acl.SecurityChecker.AccessType;
 import org.apache.cloudstack.context.CallContext;
@@ -975,7 +976,10 @@ public class IpAddressManagerImpl extends ManagerBase implements IpAddressManage
                     }
                     services.addAll(ipToServices.get(ip));
                 }
-                deployer.applyIps(network, ips, services);
+                if(network.getState()!=Network.State.UpdatatingRedundantResources || (network.getState()==Network.State.UpdatatingRedundantResources && element instanceof UpdateResourcesInSequence)){
+                        deployer.applyIps(network, ips, services);
+                }else
+                    return true;
             } catch (ResourceUnavailableException e) {
                 success = false;
                 if (!continueOnError) {
@@ -1728,7 +1732,12 @@ public class IpAddressManagerImpl extends ManagerBase implements IpAddressManage
         // get provider
         StaticNatServiceProvider element = _networkMgr.getStaticNatProviderForNetwork(network);
         try {
-            success = element.applyStaticNats(network, staticNats);
+            if(network.getState()!=Network.State.UpdatatingRedundantResources || (network.getState()==Network.State.UpdatatingRedundantResources && element instanceof UpdateResourcesInSequence &&
+                    !((UpdateResourcesInSequence) element).isUpdateComplete(network))){
+                success = element.applyStaticNats(network, staticNats);
+            }else
+                success=true;
+
         } catch (ResourceUnavailableException e) {
             if (!continueOnError) {
                 throw e;

@@ -30,8 +30,6 @@ import java.util.List;
 import com.cloud.exception.AgentUnavailableException;
 import com.cloud.network.dao.NetworkDetailVO;
 import com.cloud.network.dao.NetworkDetailsDao;
-import com.cloud.network.router.VirtualNetworkApplianceManager;
-import com.cloud.network.router.VirtualNetworkApplianceManagerImpl;
 import com.cloud.network.router.VirtualRouter;
 import com.cloud.utils.exception.CloudRuntimeException;
 import org.apache.cloudstack.engine.orchestration.service.NetworkOrchestrationService;

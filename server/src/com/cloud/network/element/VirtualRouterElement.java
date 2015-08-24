@@ -169,6 +169,8 @@ NetworkMigrationResponder, AggregatedCommandExecutor, UpdateResourcesInSequence 
     @Inject
     protected RouterDeploymentDefinitionBuilder routerDeploymentDefinitionBuilder;
 
+    private HashMap<Long,Integer> networkUpdateCountMap= new HashMap<>();
+
     protected boolean canHandle(final Network network, final Service service) {
         final Long physicalNetworkId = _networkMdl.getPhysicalNetworkId(network);
         if (physicalNetworkId == null) {
@@ -1267,6 +1269,8 @@ NetworkMigrationResponder, AggregatedCommandExecutor, UpdateResourcesInSequence 
             DomainRouterVO router=routers.get(0);
             router.setUpdateState(VirtualRouter.UpdateState.UPDATE_COMPLETE);
             _routerDao.persist(router);
+           int count =networkUpdateCountMap.get(network.getId());
+           networkUpdateCountMap.put(network.getId(),--count);
         }
         boolean result=_routerMgr.completeAggregatedExecution(network, routers);
         if(!result && updateInSequence) {
@@ -1290,6 +1294,10 @@ NetworkMigrationResponder, AggregatedCommandExecutor, UpdateResourcesInSequence 
     @Override
     public void configureResourceUpdateSequence(Network network) {
         List<DomainRouterVO>routers = _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
+        NetworkDetailVO networkDetail=_networkDetailsDao.findDetail(network.getId(), Network.updatingInSequence);
+        if(networkDetail!=null && "true".equalsIgnoreCase(networkDetail.getValue())){
+            networkUpdateCountMap.put(network.getId(),routers.size());
+        }
         for(DomainRouterVO router : routers){
             router.setUpdateState(VirtualRouter.UpdateState.UPDATE_NEEDED);
             _routerDao.persist(router);
@@ -1298,12 +1306,11 @@ NetworkMigrationResponder, AggregatedCommandExecutor, UpdateResourcesInSequence 
 
     @Override
     public boolean isUpdateComplete(Network network) {
-        List<DomainRouterVO>routers = _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
-        for(DomainRouterVO router : routers){
-            VirtualRouter.UpdateState updateState = router.getUpdateState();
-            if(updateState==VirtualRouter.UpdateState.UPDATE_IN_PROGRESS || updateState== VirtualRouter.UpdateState.UPDATE_NEEDED) return false;
+        if(networkUpdateCountMap.get(network.getId())<=0 || !networkUpdateCountMap.containsKey(network.getId())){
+            networkUpdateCountMap.remove(network.getId());
+            return true;
         }
-        return true;
+        return false;
     }
 
 }

@@ -39,6 +39,7 @@ import javax.naming.ConfigurationException;
 
 import com.cloud.network.Networks;
 
+import com.cloud.network.dao.NetworkDetailVO;
 import com.cloud.network.dao.NetworkDetailsDao;
 import com.cloud.vm.dao.DomainRouterDao;
 import org.apache.log4j.Logger;
@@ -1017,13 +1018,14 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
             _networksDao.update(networkId, network);
 
             // implement network elements and re-apply all the network rules
-            implementNetworkElementsAndResources(dest, context, network, offering);
-
+            implementNetworkElementsAndResources(dest, context, network, offering, false);
+            NetworkDetailVO networkDetail=_networkDetailsDao.findDetail(networkId,Network.updatingInSequence);
             if (isSharedNetworkWithServices(network)) {
                 network.setState(Network.State.Implemented);
-            } else {
-                stateTransitTo(network, Event.OperationSucceeded);
-            }
+            } else if(networkDetail!=null && "true".equalsIgnoreCase(networkDetail.getValue())){
+                stateTransitTo(network, Event.PartialUpdateComplete);
+            }else
+                stateTransitTo(network,Event.OperationSucceeded);
 
             network.setRestartRequired(false);
             _networksDao.update(network.getId(), network);
@@ -1062,13 +1064,16 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     }
 
     @Override
-    public void implementNetworkElementsAndResources(DeployDestination dest, ReservationContext context, Network network, NetworkOffering offering)
-            throws ConcurrentOperationException, InsufficientAddressCapacityException, ResourceUnavailableException, InsufficientCapacityException {
+    public void implementNetworkElementsAndResources(DeployDestination dest, ReservationContext context, Network network, NetworkOffering offering, boolean onlyRedundant)
+            throws ConcurrentOperationException, InsufficientAddressCapacityException, ResourceUnavailableException, InsufficientCapacityException, NoTransitionException {
 
         // Associate a source NAT IP (if one isn't already associated with the network) if this is a
         //     1) 'Isolated' or 'Shared' guest virtual network in the advance zone
         //     2) network has sourceNat service
         //     3) network offering does not support a shared source NAT rule
+        if(onlyRedundant && network.getState()!= Network.State.UpdatatingRedundantResources){
+            stateTransitTo((NetworkVO)network,Event.PartialUpdateComplete);
+        }
 
         boolean sharedSourceNat = offering.getSharedSourceNat();
         DataCenter zone = _dcDao.findById(network.getDataCenterId());
@@ -1110,6 +1115,10 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
                     s_logger.debug("Asking " + element.getName() + " to implemenet " + network);
                 }
 
+                if(onlyRedundant && !(element instanceof UpdateResourcesInSequence)){
+                    s_logger.debug("Ignoring implementing the element "+element.getName()+" it dose not support redundancy");
+                    return;
+                }
                 if (!element.implement(network, offering, dest, context)) {
                     CloudRuntimeException ex = new CloudRuntimeException("Failed to implement provider " + element.getProvider().getName() + " for network with specified id");
                     ex.addProxyObject(network.getUuid(), "networkId");
@@ -1239,6 +1248,19 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         return success;
     }
 
+    @Override
+    public void updateRedundantResources(ReservationContext context, boolean cleanUpNeeded, Network network)throws ResourceUnavailableException,
+            InsufficientAddressCapacityException, InsufficientCapacityException, NoTransitionException {
+        while(!isUpdateComplete(network)){
+            if(!shutdownNetworkElementsAndResources(context,cleanUpNeeded, network,true)){
+                throw new CloudRuntimeException("failed to shutdown network elements of redundent resources");
+            }
+            DeployDestination dest = new DeployDestination(_dcDao.findById(network.getDataCenterId()), null, null, null);
+            NetworkOffering networkOffering=_networkOfferingDao.findById(network.getNetworkOfferingId());
+            implementNetworkElementsAndResources(dest,context,network,networkOffering,true);
+        }
+        stateTransitTo((NetworkVO) network, Event.OperationSucceeded);
+    }
     protected boolean prepareElement(NetworkElement element, Network network, NicProfile profile, VirtualMachineProfile vmProfile, DeployDestination dest,
             ReservationContext context) throws InsufficientCapacityException, ConcurrentOperationException, ResourceUnavailableException {
         element.prepare(network, profile, vmProfile, dest, context);
@@ -1278,30 +1300,33 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     }
 
     @Override
-    public void configureUpdateInSequence(Network network) {
+    public void configureUpdateInSequence(Network network) throws NoTransitionException {
         List<Provider> providers = getNetworkProviders(network.getId());
+        stateTransitTo((NetworkVO)network,Event.Updating);
         for (NetworkElement element : networkElements) {
             if (providers.contains(element.getProvider())) {
                 if (element instanceof UpdateResourcesInSequence) {
                     ((UpdateResourcesInSequence) element).configureResourceUpdateSequence(network);
-                    return;
                 }
             }
         }
-        throw  new CloudRuntimeException("The network "+network.getId()+" dose not implement the required provider");
     }
 
     @Override
     public boolean isUpdateComplete(Network network){
         List<Provider> providers = getNetworkProviders(network.getId());
+        boolean updateComplete=true;
         for (NetworkElement element : networkElements) {
             if (providers.contains(element.getProvider())) {
                 if (element instanceof UpdateResourcesInSequence) {
-                    return ((UpdateResourcesInSequence) element).isUpdateComplete(network);
+                    if(!((UpdateResourcesInSequence) element).isUpdateComplete(network)){
+                        updateComplete=false;
+                        break;
+                    }
                 }
             }
         }
-        throw  new CloudRuntimeException("The network "+network.getId()+" dose not implement the required provider");
+        return updateComplete;
     }
 
     @DB
@@ -2182,7 +2207,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
                 }
             }
 
-            final boolean success = shutdownNetworkElementsAndResources(context, cleanupElements, network);
+            final boolean success = shutdownNetworkElementsAndResources(context, cleanupElements, network, false);
 
             final NetworkVO networkFinal = network;
             boolean result = Transaction.execute(new TransactionCallback<Boolean>() {
@@ -2239,7 +2264,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     }
 
     @Override
-    public boolean shutdownNetworkElementsAndResources(ReservationContext context, boolean cleanupElements, Network network) {
+    public boolean shutdownNetworkElementsAndResources(ReservationContext context, boolean cleanupElements, Network network, boolean onlyRedundant) {
 
         // get providers to shutdown
         List<Provider> providersToShutdown = getNetworkProviders(network.getId());
@@ -2274,6 +2299,9 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
                 try {
                     if (s_logger.isDebugEnabled()) {
                         s_logger.debug("Sending network shutdown to " + element.getName());
+                    }
+                    if(onlyRedundant && !(element instanceof UpdateResourcesInSequence)){
+                        return true;
                     }
                     if (!element.shutdown(network, context, cleanupElements)) {
                         s_logger.warn("Unable to complete shutdown of the network elements due to element: " + element.getName());
@@ -2577,7 +2605,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
             // shutdown the network
             s_logger.debug("Shutting down the network id=" + networkId + " as a part of network restart");
 
-            if (!shutdownNetworkElementsAndResources(context, true, network)) {
+            if (!shutdownNetworkElementsAndResources(context, true, network, false)) {
                 s_logger.debug("Failed to shutdown the network elements and resources as a part of network restart: " + network.getState());
                 setRestartRequired(network, true);
                 return false;
@@ -2593,7 +2621,7 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         NetworkOfferingVO offering = _networkOfferingDao.findById(network.getNetworkOfferingId());
 
         try {
-            implementNetworkElementsAndResources(dest, context, network, offering);
+            implementNetworkElementsAndResources(dest, context, network, offering, false);
             setRestartRequired(network, true);
             return true;
         } catch (Exception ex) {

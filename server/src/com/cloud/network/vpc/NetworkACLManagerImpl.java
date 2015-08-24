@@ -22,6 +22,7 @@ import java.util.List;
 import javax.ejb.Local;
 import javax.inject.Inject;
 
+import com.cloud.network.element.UpdateResourcesInSequence;
 import org.apache.cloudstack.context.CallContext;
 import org.apache.cloudstack.framework.messagebus.MessageBus;
 import org.apache.cloudstack.framework.messagebus.PublishScope;
@@ -489,7 +490,11 @@ public class NetworkACLManagerImpl extends ManagerBase implements NetworkACLMana
             }
             foundProvider = true;
             s_logger.debug("Applying NetworkACL for network: " + network.getId() + " with Network ACL service provider");
-            handled = element.applyNetworkACLs(network, rules);
+            if(network.getState()!=Network.State.UpdatatingRedundantResources || (network.getState()==Network.State.UpdatatingRedundantResources && element instanceof UpdateResourcesInSequence &&
+                    !((UpdateResourcesInSequence) element).isUpdateComplete(network))){
+                handled = element.applyNetworkACLs(network, rules);
+            }else
+               return true;
             if (handled) {
                 // publish message on message bus, so that network elements implementing distributed routing
                 // capability can act on the event

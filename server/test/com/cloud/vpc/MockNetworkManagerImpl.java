@@ -25,6 +25,7 @@ import javax.ejb.Local;
 import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
+import com.cloud.utils.fsm.NoTransitionException;
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
 import org.apache.cloudstack.api.command.admin.network.DedicateGuestVlanRangeCmd;
 import org.apache.cloudstack.api.command.admin.network.ListDedicatedGuestVlanRangesCmd;
@@ -725,7 +726,7 @@ public class MockNetworkManagerImpl extends ManagerBase implements NetworkOrches
      * @see com.cloud.network.NetworkManager#shutdownNetworkElementsAndResources(com.cloud.vm.ReservationContext, boolean, com.cloud.network.NetworkVO)
      */
     @Override
-    public boolean shutdownNetworkElementsAndResources(ReservationContext context, boolean b, Network network) {
+    public boolean shutdownNetworkElementsAndResources(ReservationContext context, boolean b, Network network, boolean onlyRedundant) {
         // TODO Auto-generated method stub
         return false;
     }
@@ -734,7 +735,7 @@ public class MockNetworkManagerImpl extends ManagerBase implements NetworkOrches
      * @see com.cloud.network.NetworkManager#implementNetworkElementsAndResources(com.cloud.deploy.DeployDestination, com.cloud.vm.ReservationContext, com.cloud.network.NetworkVO, com.cloud.offerings.NetworkOfferingVO)
      */
     @Override
-    public void implementNetworkElementsAndResources(DeployDestination dest, ReservationContext context, Network network, NetworkOffering findById)
+    public void implementNetworkElementsAndResources(DeployDestination dest, ReservationContext context, Network network, NetworkOffering findById, boolean onlyRedundant)
         throws ConcurrentOperationException, InsufficientAddressCapacityException, ResourceUnavailableException, InsufficientCapacityException {
         // TODO Auto-generated method stub
 
@@ -856,6 +857,11 @@ public class MockNetworkManagerImpl extends ManagerBase implements NetworkOrches
     @Override
     public boolean isUpdateComplete(Network network) {
         return false;
+    }
+
+    @Override
+    public void updateRedundantResources(ReservationContext context, boolean cleanUpNeeded, Network network) throws ResourceUnavailableException, InsufficientAddressCapacityException, InsufficientCapacityException, NoTransitionException {
+        return;
     }
 
     @Override
