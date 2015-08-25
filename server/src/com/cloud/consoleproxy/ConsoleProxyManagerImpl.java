@@ -1432,7 +1432,7 @@ public class ConsoleProxyManagerImpl extends ManagerBase implements ConsoleProxy
                 uiFiles = new File("/usr/share/cloudstack-common/systemvm/js");
             }
             if (uiFiles.exists() && uiFiles.isDirectory()) {
-                CopyFileInVmCommand copyFile = new CopyFileInVmCommand(uiFiles.getCanonicalPath(), "/usr/local/cloud/systemvm/js", controlNic.getIp4Address());
+                CopyFileInVmCommand copyFile = new CopyFileInVmCommand(uiFiles.getCanonicalPath(), "/usr/local/cloud/systemvm/js", controlNic.getIPv4Address());
                 cmds.addCommand("copyFile", copyFile);
             } else {
                 s_logger.error("Couldn't locate localization files for console proxy");
