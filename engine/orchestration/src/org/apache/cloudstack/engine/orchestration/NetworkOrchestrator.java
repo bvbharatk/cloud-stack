@@ -40,6 +40,7 @@ import javax.naming.ConfigurationException;
 import com.cloud.network.Networks;
 
 import com.cloud.network.dao.NetworkDetailsDao;
+import com.cloud.network.element.RedundantResource;
 import com.cloud.vm.dao.DomainRouterDao;
 import org.apache.log4j.Logger;
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
@@ -210,7 +211,6 @@ import com.cloud.vm.dao.NicSecondaryIpDao;
 import com.cloud.vm.dao.NicSecondaryIpVO;
 import com.cloud.vm.dao.UserVmDao;
 import com.cloud.vm.dao.VMInstanceDao;
-import com.cloud.network.element.UpdateResourcesInSequence;
 
 /**
  * NetworkManagerImpl implements NetworkManager.
@@ -1267,14 +1267,12 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
     @Override
     public boolean canUpdateInSequence(Network network){
         List<Provider> providers = getNetworkProviders(network.getId());
-        for (NetworkElement element : networkElements) {
-            if (providers.contains(element.getProvider())) {
-                if(element instanceof UpdateResourcesInSequence){
-                    return true;
-                }
-            }
+        //check if the there are no service provider other than virtualrouter.
+        for(Provider provider :providers){
+            if(provider!=Provider.VirtualRouter)
+                throw new UnsupportedOperationException("Cannot update the network resources in sequence when providers other than virtualrouter are used");
         }
-        return false;
+        return true;
     }
 
     @Override
@@ -1282,27 +1280,29 @@ public class NetworkOrchestrator extends ManagerBase implements NetworkOrchestra
         List<Provider> providers = getNetworkProviders(network.getId());
         for (NetworkElement element : networkElements) {
             if (providers.contains(element.getProvider())) {
-                if (element instanceof UpdateResourcesInSequence) {
-                    ((UpdateResourcesInSequence) element).configureResourceUpdateSequence(network);
-                    return;
+                if (element instanceof RedundantResource) {
+                    ((RedundantResource) element).configureResource(network);
                 }
             }
         }
-        throw  new CloudRuntimeException("The network "+network.getId()+" dose not implement the required provider");
     }
 
     @Override
-    public boolean isUpdateComplete(Network network){
+    public int getResourceCount(Network network){
         List<Provider> providers = getNetworkProviders(network.getId());
+        int resourceCount=0;
         for (NetworkElement element : networkElements) {
             if (providers.contains(element.getProvider())) {
-                if (element instanceof UpdateResourcesInSequence) {
-                    return ((UpdateResourcesInSequence) element).isUpdateComplete(network);
+                //currently only one element implements the redundant resource interface
+                if (element instanceof RedundantResource) {
+                    resourceCount= ((RedundantResource) element).getResourceCount(network);
+                    break;
+                    }
                 }
             }
+        return resourceCount;
         }
-        throw  new CloudRuntimeException("The network "+network.getId()+" dose not implement the required provider");
-    }
+
 
     @DB
     protected void updateNic(final NicVO nic, final long networkId, final int count) {

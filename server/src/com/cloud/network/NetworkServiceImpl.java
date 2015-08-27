@@ -128,7 +128,6 @@ import com.cloud.network.element.VirtualRouterElement;
 import com.cloud.network.element.VpcVirtualRouterElement;
 import com.cloud.network.guru.NetworkGuru;
 import com.cloud.network.lb.LoadBalancingRulesService;
-import com.cloud.network.router.VirtualRouter;
 import com.cloud.network.rules.FirewallRule.Purpose;
 import com.cloud.network.rules.FirewallRuleVO;
 import com.cloud.network.rules.RulesManager;
@@ -1998,8 +1997,7 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
     @DB
     @ActionEvent(eventType = EventTypes.EVENT_NETWORK_UPDATE, eventDescription = "updating network", async = true)
     public Network updateGuestNetwork(final long networkId, String name, String displayText, Account callerAccount, User callerUser, String domainSuffix,
-            final Long networkOfferingId, Boolean changeCidr, String guestVmCidr, Boolean displayNetwork, String customId) {
-
+            final Long networkOfferingId, Boolean changeCidr, String guestVmCidr, Boolean displayNetwork, String customId, boolean updateInSequence) {
         boolean restartNetwork = false;
 
         // verify input parameters
@@ -2242,20 +2240,20 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
         ReservationContext context = new ReservationContextImpl(null, null, callerUser, callerAccount);
         // 1) Shutdown all the elements and cleanup all the rules. Don't allow to shutdown network in intermediate
         // states - Shutdown and Implementing
-        boolean updateInsequence=false;
         List<DomainRouterVO> routers=null;
-        if(_networkOfferingDao.findById(network.getNetworkOfferingId()).getRedundantRouter() && _networkOfferingDao.findById(networkOfferingId).getRedundantRouter() && network.getVpcId()==null) {
-            updateInsequence=_networkMgr.canUpdateInSequence(network);
-            if(updateInsequence){
-                _networkMgr.configureUpdateInSequence(network);
-                NetworkDetailVO networkDetail =new NetworkDetailVO(network.getId(),Network.updatingInSequence,"true",true);
-                _networkDetailsDao.persist(networkDetail);
-            }
+        int resourceCount=1;
+        if(updateInSequence && restartNetwork && _networkOfferingDao.findById(network.getNetworkOfferingId()).getRedundantRouter() && _networkOfferingDao.findById(networkOfferingId).getRedundantRouter() && network.getVpcId()==null) {
+            _networkMgr.canUpdateInSequence(network);
+            NetworkDetailVO networkDetail =new NetworkDetailVO(network.getId(),Network.updatingInSequence,"true",true);
+            _networkDetailsDao.persist(networkDetail);
+            _networkMgr.configureUpdateInSequence(network);
+            resourceCount=_networkMgr.getResourceCount(network);
         }
 
         boolean validStateToShutdown = (network.getState() == Network.State.Implemented || network.getState() == Network.State.Setup || network.getState() == Network.State.Allocated);
         //think about faliure cases, the network needs to be returned to some consistent state in case of failure.
         try {
+
             do {
                 if (restartNetwork) {
                     if (validStateToShutdown) {
@@ -2379,31 +2377,18 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
                         }
                     }
                 }
-            } while(updateInsequence && !_networkMgr.isUpdateComplete(network));
+                resourceCount--;
+            } while(updateInSequence && resourceCount>0);
         }catch (Exception exception){
              throw new CloudRuntimeException("failed to update network "+network.getUuid()+"due to "+exception.getMessage());
         }finally {
-            if(updateInsequence){
+            if(updateInSequence){
                 if( _networkDetailsDao.findDetail(networkId,Network.updatingInSequence)!=null){
                     _networkDetailsDao.removeDetail(networkId,Network.updatingInSequence);
                 }
             }
         }
         return getNetwork(network.getId());
-    }
-
-    private List<DomainRouterVO> getRoutersNeedingUpdate(NetworkVO network, List<DomainRouterVO> routers) {
-        routers=_routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
-        for(int i=0; i< routers.size(); i++){
-            DomainRouterVO router=routers.get(i);
-            if(router.getUpdateState()== VirtualRouter.UpdateState.UPDATE_COMPLETE) routers.remove(router);
-            else if(router.getUpdateState()== VirtualRouter.UpdateState.UPDATE_IN_PROGRESS) {
-                router.setUpdateState(VirtualRouter.UpdateState.UPDATE_COMPLETE);
-                _routerDao.persist(router);
-                routers.remove(router);
-            }
-        }
-        return routers;
     }
 
     protected Set<Long> getAvailableIps(Network network, String requestedIp) {

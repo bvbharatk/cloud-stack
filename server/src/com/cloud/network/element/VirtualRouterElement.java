@@ -115,7 +115,7 @@ import com.google.gson.Gson;
         LoadBalancingServiceProvider.class, PortForwardingServiceProvider.class, IpDeployer.class, RemoteAccessVPNServiceProvider.class, NetworkMigrationResponder.class })
 public class VirtualRouterElement extends AdapterBase implements VirtualRouterElementService, DhcpServiceProvider, UserDataServiceProvider, SourceNatServiceProvider,
 StaticNatServiceProvider, FirewallServiceProvider, LoadBalancingServiceProvider, PortForwardingServiceProvider, RemoteAccessVPNServiceProvider, IpDeployer,
-NetworkMigrationResponder, AggregatedCommandExecutor, UpdateResourcesInSequence {
+NetworkMigrationResponder, AggregatedCommandExecutor, RedundantResource {
     private static final Logger s_logger = Logger.getLogger(VirtualRouterElement.class);
     public static final AutoScaleCounterType AutoScaleCounterCpu = new AutoScaleCounterType("cpu");
     public static final AutoScaleCounterType AutoScaleCounterMemory = new AutoScaleCounterType("memory");
@@ -1268,13 +1268,17 @@ NetworkMigrationResponder, AggregatedCommandExecutor, UpdateResourcesInSequence 
             router.setUpdateState(VirtualRouter.UpdateState.UPDATE_COMPLETE);
             _routerDao.persist(router);
         }
-        boolean result=_routerMgr.completeAggregatedExecution(network, routers);
-        if(!result && updateInSequence) {
-            //fail the network update. even if one router fails we fail the network update.
-            List<DomainRouterVO> routerList = _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
-            for (DomainRouterVO router : routerList) {
-                router.setUpdateState(VirtualRouter.UpdateState.UPDATE_FAILED);
-                _routerDao.persist(router);
+        boolean result=false;
+        try{
+            result=_routerMgr.completeAggregatedExecution(network, routers);
+        } finally {
+            if(!result && updateInSequence) {
+                //fail the network update. even if one router fails we fail the network update.
+                List<DomainRouterVO> routerList = _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
+                for (DomainRouterVO router : routerList) {
+                    router.setUpdateState(VirtualRouter.UpdateState.UPDATE_FAILED);
+                    _routerDao.persist(router);
+                }
             }
         }
         return result;
@@ -1288,7 +1292,10 @@ NetworkMigrationResponder, AggregatedCommandExecutor, UpdateResourcesInSequence 
     }
 
     @Override
-    public void configureResourceUpdateSequence(Network network) {
+    public void configureResource(Network network) {
+        NetworkDetailVO networkDetail=_networkDetailsDao.findDetail(network.getId(), Network.updatingInSequence);
+        if(networkDetail==null || !"true".equalsIgnoreCase(networkDetail.getValue()))
+            throw new CloudRuntimeException("failed to configure the resource, network update is not in progress.");
         List<DomainRouterVO>routers = _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
         for(DomainRouterVO router : routers){
             router.setUpdateState(VirtualRouter.UpdateState.UPDATE_NEEDED);
@@ -1297,13 +1304,8 @@ NetworkMigrationResponder, AggregatedCommandExecutor, UpdateResourcesInSequence 
     }
 
     @Override
-    public boolean isUpdateComplete(Network network) {
-        List<DomainRouterVO>routers = _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER);
-        for(DomainRouterVO router : routers){
-            VirtualRouter.UpdateState updateState = router.getUpdateState();
-            if(updateState==VirtualRouter.UpdateState.UPDATE_IN_PROGRESS || updateState== VirtualRouter.UpdateState.UPDATE_NEEDED) return false;
-        }
-        return true;
+    public int getResourceCount(Network network) {
+        return _routerDao.listByNetworkAndRole(network.getId(), VirtualRouter.Role.VIRTUAL_ROUTER).size();
     }
 
 }
