@@ -249,7 +249,7 @@ public class MockNetworkManagerImpl extends ManagerBase implements NetworkOrches
      */
     @Override
     public Network updateGuestNetwork(long networkId, String name, String displayText, Account callerAccount, User callerUser, String domainSuffix,
-        Long networkOfferingId, Boolean changeCidr, String guestVmCidr, Boolean displayNetwork, String newUUID) {
+        Long networkOfferingId, Boolean changeCidr, String guestVmCidr, Boolean displayNetwork, String newUUID,boolean updateInSequence) {
         // TODO Auto-generated method stub
         return null;
     }
@@ -854,8 +854,8 @@ public class MockNetworkManagerImpl extends ManagerBase implements NetworkOrches
     }
 
     @Override
-    public boolean isUpdateComplete(Network network) {
-        return false;
+    public int getResourceCount(Network network) {
+        return 0;
     }
 
     @Override

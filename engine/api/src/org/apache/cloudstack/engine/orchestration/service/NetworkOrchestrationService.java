@@ -229,5 +229,5 @@ public interface NetworkOrchestrationService {
 
     void configureUpdateInSequence(Network network);
 
-    boolean isUpdateComplete(Network network);
+    int getResourceCount(Network network);
 }
