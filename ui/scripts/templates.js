@@ -16,6 +16,8 @@
 // under the License.
 (function(cloudStack, $) {
     var ostypeObjs;
+    var previousCollection = [];
+    var previousFilterType = null;
 
     cloudStack.sections.templates = {
         title: 'label.menu.templates',
@@ -877,10 +879,18 @@
                     dataProvider: function(args) {
                         var data = {};
                         listViewDataProvider(args, data);
+                        // Due to zonal grouping, low pagesize can result lower
+                        // aggregated items, resulting in no scroll shown
+                        // So, use maximum pagesize
+                        data.pagesize = 200;
 
                         var ignoreProject = false;
                         if (args.filterBy != null) { //filter dropdown
                             if (args.filterBy.kind != null) {
+                                if (previousFilterType != args.filterBy.kind || args.page == 1) {
+                                    previousFilterType = args.filterBy.kind;
+                                    previousCollection = [];
+                                }
                                 switch (args.filterBy.kind) {
                                     case "all":
                                         ignoreProject = true;
@@ -924,19 +934,19 @@
                                 var itemsView = [];
 
                                 $(items).each(function(index, item) {
-                                    var existing = $.grep(itemsView, function(it){
+                                    var existing = $.grep(previousCollection, function(it){
                                         return it != null && it.id !=null && it.id == item.id;
                                     });
 
-                                    if (existing.length == 0) {
-                                        itemsView.push($.extend(item, {
+                                    if (existing.length > 0) {
+                                        return true; // skip adding this entry
+                                    } else {
+                                        var templateItem = $.extend(item, {
                                             zones: item.zonename,
                                             zoneids: [item.zoneid]
-                                        }));
-                                    }
-                                    else {
-                                        existing[0].zones = 'label.multiplezones';
-                                        existing[0].zoneids.push(item.zoneid);
+                                        });
+                                        itemsView.push(templateItem);
+                                        previousCollection.push(templateItem);
                                     }
                                 });
 
@@ -1377,12 +1387,13 @@
 
 
                                     dataProvider: function(args) {  // UI > Templates menu (listing) > select a template from listing > Details tab > Zones tab (listing)
+                                        var data = { templatefilter: "self",
+                                                     id: args.context.templates[0].id
+                                                   };
+                                        listViewDataProvider(args, data);
                                         $.ajax({
                                             url: createURL("listTemplates"),
-                                            data: {
-                                                templatefilter: "self",
-                                                id: args.context.templates[0].id
-                                            },
+                                            data: data,
                                             success: function(json) {
                                                 var jsonObjs = json.listtemplatesresponse.template;
 
@@ -2017,10 +2028,18 @@
                     dataProvider: function(args) {
                         var data = {};
                         listViewDataProvider(args, data);
+                        // Due to zonal grouping, low pagesize can result lower
+                        // aggregated items, resulting in no scroll shown
+                        // So, use maximum pagesize
+                        data.pagesize = 200;
 
                         var ignoreProject = false;
                         if (args.filterBy != null) { //filter dropdown
                             if (args.filterBy.kind != null) {
+                                if (previousFilterType != args.filterBy.kind || args.page == 1) {
+                                    previousFilterType = args.filterBy.kind;
+                                    previousCollection = [];
+                                }
                                 switch (args.filterBy.kind) {
                                     case "all":
                                         ignoreProject = true;
@@ -2064,22 +2083,24 @@
 
                                 var itemsView = [];
                                 $(items).each(function(index, item) {
-                                    var existing = $.grep(itemsView, function(it){
+                                    var existing = $.grep(previousCollection, function(it){
                                         return it != null && it.id !=null && it.id == item.id;
                                     });
-                                    if (existing.length == 0) {
-                                        itemsView.push({
+
+
+                                    if (existing.length > 0) {
+                                        return true; // skip adding this entry
+                                    } else {
+                                        var isoItem = {
                                             id: item.id,
                                             name: item.name,
                                             description: item.description,
                                             ostypeid: item.ostypeid,
                                             zones: item.zonename,
                                             zoneids: [item.zoneid]
-                                        });
-                                    }
-                                    else {
-                                        existing[0].zones = 'Multiple Zones';
-                                        existing[0].zoneids.push(item.zoneid);
+                                        };
+                                        itemsView.push(isoItem);
+                                        previousCollection.push(isoItem);
                                     }
                                 }
 );
@@ -2382,11 +2403,14 @@
                                     hideSearchBar: true,
 
                                     dataProvider: function(args) {
-                                                var jsonObj = args.context.isos[0];
-                                                var apiCmd = "listIsos&isofilter=self&id=" + jsonObj.id;
-
+                                                var data = {
+                                                    isofilter: 'self',
+                                                    id: args.context.isos[0].id
+                                                };
+                                                listViewDataProvider(args, data);
                                                 $.ajax({
-                                                    url: createURL(apiCmd),
+                                                    url: createURL('listIsos'),
+                                                    data: data,
                                                     dataType: "json",
                                                     success: function(json) {
                                                             var isos = json.listisosresponse.iso;

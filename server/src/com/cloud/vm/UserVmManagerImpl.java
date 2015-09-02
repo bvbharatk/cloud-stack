@@ -1500,7 +1500,7 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
 
         Account caller = CallContext.current().getCallingAccount();
         VMInstanceVO vmInstance = _vmInstanceDao.findById(vmId);
-        if (vmInstance.getHypervisorType() != HypervisorType.XenServer && vmInstance.getHypervisorType() != HypervisorType.VMware) {
+        if (vmInstance.getHypervisorType() != HypervisorType.XenServer && vmInstance.getHypervisorType() != HypervisorType.VMware && vmInstance.getHypervisorType() != HypervisorType.Simulator) {
             s_logger.info("Scaling the VM dynamically is not supported for VMs running on Hypervisor "+vmInstance.getHypervisorType());
             throw new InvalidParameterValueException("Scaling the VM dynamically is not supported for VMs running on Hypervisor "+vmInstance.getHypervisorType());
         }
@@ -2147,7 +2147,7 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
         String userData = cmd.getUserData();
         Boolean isDynamicallyScalable = cmd.isDynamicallyScalable();
         String hostName = cmd.getHostName();
-        Map details = cmd.getDetails();
+        Map<String,String> details = cmd.getDetails();
         Account caller = CallContext.current().getCallingAccount();
 
         // Input validation and permission checks
@@ -2188,7 +2188,13 @@ public class UserVmManagerImpl extends ManagerBase implements UserVmManager, Vir
         }
 
         if (details != null && !details.isEmpty()) {
-            vmInstance.setDetails(details);
+            _vmDao.loadDetails(vmInstance);
+
+            for(Map.Entry<String,String> entry : details.entrySet()) {
+                if(entry instanceof Map.Entry) {
+                    vmInstance.setDetail(entry.getKey(), entry.getValue());
+                }
+            }
             _vmDao.saveDetails(vmInstance);
         }
 

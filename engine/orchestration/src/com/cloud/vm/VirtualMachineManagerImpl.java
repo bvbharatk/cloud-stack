@@ -4295,7 +4295,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
             workJob = new VmWorkJobVO(context.getContextId());
 
             workJob.setDispatcher(VmWorkConstants.VM_WORK_JOB_DISPATCHER);
-            workJob.setCmd(VmWorkMigrate.class.getName());
+            workJob.setCmd(VmWorkMigrateWithStorage.class.getName());
 
             workJob.setAccountId(account.getId());
             workJob.setUserId(user.getId());
@@ -4338,7 +4338,7 @@ public class VirtualMachineManagerImpl extends ManagerBase implements VirtualMac
             workJob = new VmWorkJobVO(context.getContextId());
 
             workJob.setDispatcher(VmWorkConstants.VM_WORK_JOB_DISPATCHER);
-            workJob.setCmd(VmWorkMigrate.class.getName());
+            workJob.setCmd(VmWorkMigrateForScale.class.getName());
 
             workJob.setAccountId(account.getId());
             workJob.setUserId(user.getId());
