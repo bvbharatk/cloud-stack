@@ -452,6 +452,7 @@ class CsSite2SiteVpn(CsDataBag):
         file.add("#conn for vpn-%s" % rightpeer, 0)
         file.search("conn ", "conn vpn-%s" % rightpeer)
         file.addeq(" left=%s" % leftpeer)
+        #TODO: multiple cidr case need to handled here
         file.addeq(" leftsubnet=%s" % obj['local_guest_cidr'])
         file.addeq(" leftnexthop=%s" % obj['local_public_gateway'])
         file.addeq(" right=%s" % rightpeer)
@@ -645,9 +646,9 @@ class CsRemoteAccessVpn(CsDataBag):
 
         self.fw.append(["mangle", "","-N  VPN_%s " %publicip])
         self.fw.append(["mangle", "","-I PREROUTING  -d %s -j VPN_%s " % (publicip, publicip)])
-        self.fw.append(["mangle", "","-A VPN_%s -p ah  -j ACCEPT " % publicip])
-        self.fw.append(["mangle", "","-A VPN_%s -p esp  -j ACCEPT " % publicip])
         self.fw.append(["mangle", "","-A VPN_%s -j RETURN " % publicip])
+        self.fw.append(["mangle", "front","-A VPN_%s -p ah  -j ACCEPT " % publicip])
+        self.fw.append(["mangle", "front","-A VPN_%s -p esp  -j ACCEPT " % publicip])
 
 
 class CsForwardingRules(CsDataBag):
